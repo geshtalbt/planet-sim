@@ -252,7 +252,7 @@ pub fn update_climate(
             c.pressure_kpa = c.local_pressure_kpa(sea_level, atmosphere.pressure_kpa, scale_height);
             c.cloud_cover = (atmosphere.cloud_coverage * 0.72 + c.humidity * 0.28).clamp(0.02, 1.0);
             c.albedo = if c.ice_thickness_m > 0.25 || c.snow_depth_m > 0.02 {
-                (0.62 + 0.12 * c.ice_thickness_m.min(2.0)).min(0.88)
+                (0.58 + 0.06 * c.ice_thickness_m.min(2.0)).min(0.70)
             } else if submerged {
                 Biome::Ocean.base_albedo()
             } else {

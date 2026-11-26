@@ -842,6 +842,39 @@ mod event_tests {
     }
 
     #[test]
+    fn snowball_is_not_a_permanent_dead_end() {
+        let mut planet = PlanetState::new(config(21)).expect("planet");
+        planet.set_solar_multiplier(0.55);
+        for _ in 0..10 {
+            planet.step_slice(1_000_000.0);
+        }
+        assert!(
+            planet.stats.glacier_fraction > 0.80,
+            "test did not reach a snowball state: {}",
+            planet.stats.glacier_fraction
+        );
+        planet.set_solar_multiplier(1.0);
+        for _ in 0..40 {
+            planet.step_slice(1_000_000.0);
+        }
+        assert!(
+            planet.stats.glacier_fraction < 0.80,
+            "snowball did not retreat: {}",
+            planet.stats.glacier_fraction
+        );
+        assert!(
+            planet.stats.mean_temp_c > -20.0,
+            "temperature remained in the dead state: {}",
+            planet.stats.mean_temp_c
+        );
+        assert!(
+            planet.stats.co2_ppm > 1000.0,
+            "CO2 inventory did not recover: {}",
+            planet.stats.co2_ppm
+        );
+    }
+
+    #[test]
     fn simulation_forks_and_checkpoints_work() {
         let mut sim = crate::simulation::Simulation::new(config(13)).expect("simulation");
         sim.advance_years(5.0);

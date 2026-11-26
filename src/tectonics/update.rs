@@ -187,7 +187,7 @@ pub fn tectonic_step(
         } else {
             0.0
         };
-        c.bedrock_m = (c.bedrock_m + smoothed[cell] - erosion - glacial).clamp(-35_000.0, 30_000.0);
+        c.bedrock_m = (c.bedrock_m + smoothed[cell] - erosion - glacial).clamp(-12_000.0, 10_000.0);
         let activity_decay = (-dt_myr / 3.0).exp();
         c.volcanic_activity = (c.volcanic_activity * activity_decay).max(volcanic[cell]);
         c.quake_activity = (c.quake_activity * activity_decay).max(quake[cell]);

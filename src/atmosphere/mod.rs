@@ -131,12 +131,22 @@ impl CarbonState {
         self.ocean_ppm_equiv -= delta;
 
         // Silicate weathering: a slow sink proportional to temperature and
-        // atmospheric CO₂. Material is moved to the geological reservoir.
-        let weathering =
-            atm / 280.0 * (1.0 + 0.04 * (ocean_temp_c - 15.0).clamp(-30.0, 30.0)) * 0.002 * dt;
+        // atmospheric CO₂. It nearly stops on a frozen planet. Material is
+        // moved to the geological reservoir.
+        let temperature_factor =
+            (1.0 + 0.04 * (ocean_temp_c - 15.0).clamp(-30.0, 30.0)).clamp(0.05, 3.0);
+        let weathering = *atmosphere_ppm / 280.0 * temperature_factor * 0.003 * dt;
         let weather = weathering.min(*atmosphere_ppm * 0.999).max(0.0);
         *atmosphere_ppm -= weather;
         self.geological_ppm_equiv += weather;
+
+        // Baseline volcanic/metamorphic outgassing. On a cold, frozen world
+        // weathering is suppressed while this source continues, so CO₂
+        // accumulates and can eventually break a snowball state.
+        let wanted = 0.003 * dt;
+        let outgassing = wanted.min(self.geological_ppm_equiv.max(0.0));
+        self.geological_ppm_equiv -= outgassing;
+        *atmosphere_ppm += outgassing;
     }
 
     pub fn outgas(&mut self, atmosphere_ppm: &mut f32, ppm: f32) {
@@ -161,5 +171,17 @@ mod tests {
         carbon.exchange(&mut atm, 1_000.0, 17.0);
         let after = carbon.total_ppm(atm);
         assert!((before - after).abs() < 1.0e-3, "{before} vs {after}");
+    }
+
+    #[test]
+    fn frozen_ocean_outgassing_raises_co2_and_conserves_carbon() {
+        let cfg = PlanetConfig::default();
+        let mut atm = cfg.co2_ppm;
+        let mut carbon = CarbonState::from_config(&cfg);
+        let before = carbon.total_ppm(atm);
+        carbon.exchange(&mut atm, 1_000_000.0, -20.0);
+        let after = carbon.total_ppm(atm);
+        assert!(atm > cfg.co2_ppm, "CO₂ did not rise: {atm}");
+        assert!((before - after).abs() < 1.0e-2, "{before} vs {after}");
     }
 }

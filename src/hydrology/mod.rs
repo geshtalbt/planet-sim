@@ -187,6 +187,16 @@ pub fn hydrology_step(
                 c.soil_moisture_m = c.soil_moisture_m.min(0.4);
             }
         }
+        // A slow geothermal/basal melt prevents a completely frozen world
+        // from becoming a permanent numerical dead end. The meltwater
+        // returns to the ocean reservoir through the sea-level solve.
+        if c.ice_thickness_m > 25.0 && c.temp_c <= 0.0 {
+            let basal = (0.000_2 * dt).min(c.ice_thickness_m);
+            c.ice_thickness_m -= basal;
+            if !submerged {
+                c.soil_moisture_m = (c.soil_moisture_m + basal * 0.25).min(0.4);
+            }
+        }
 
         if submerged {
             c.soil_moisture_m = 0.0;
@@ -224,7 +234,39 @@ pub fn hydrology_step(
     route_rivers(grid, sea_level);
 
     // --- Global reservoirs and sea level ---------------------------------
-    let (ice, soil) = ice_and_soil_volumes(grid);
+    let (mut ice, soil) = ice_and_soil_volumes(grid);
+    // Do not let land ice consume the entire water inventory. Without this
+    // cap, snowfall on newly exposed shelves can freeze the ocean, expose
+    // more shelf, freeze that too, and collapse into a dry ice world. Sea ice
+    // is deliberately not scaled: thin sea ice is essential for a snowball's
+    // high albedo and must remain physically represented.
+    let max_ice = state.total_water_km3 * 0.12;
+    if ice > max_ice && ice > 0.0 {
+        let sea_level = state.effective_sea_level_m();
+        let mut sea_ice = 0.0;
+        for (c, a) in grid.cells.iter().zip(&grid.cell_area_m2) {
+            if c.bedrock_m < sea_level {
+                sea_ice += (*a as f64 / 1.0e6) * (c.ice_thickness_m as f64 / 1_000.0);
+            }
+        }
+        let land_budget = (max_ice - sea_ice).max(0.0);
+        let mut land_ice = 0.0;
+        for (c, a) in grid.cells.iter().zip(&grid.cell_area_m2) {
+            if c.bedrock_m >= sea_level {
+                land_ice += (*a as f64 / 1.0e6) * (c.ice_thickness_m as f64 / 1_000.0);
+            }
+        }
+        if land_ice > land_budget && land_ice > 0.0 {
+            let scale = (land_budget / land_ice) as f32;
+            for c in &mut grid.cells {
+                if c.bedrock_m >= sea_level {
+                    c.ice_thickness_m *= scale;
+                    c.snow_depth_m *= scale;
+                }
+            }
+        }
+        ice = max_ice.max(sea_ice);
+    }
     state.ice_volume_km3 = ice;
     state.soil_water_km3 = soil;
     state.mean_precip_mm_yr = grid.weighted_mean(|c| c.precip_mm_yr);
@@ -308,7 +350,10 @@ pub fn rebalance_sea_level(
     }
     // Keep the sea level within a physically meaningful range even when an
     // extreme water inventory is requested.
-    sea = sea.clamp(min_bedrock - 1.0, max_bedrock + 1.0);
+    sea = sea.clamp(
+        (min_bedrock - 1.0).max(-4_000.0),
+        (max_bedrock + 1.0).min(8_000.0),
+    );
     state.sea_level_m = sea;
     let effective = state.effective_sea_level_m();
     grid.apply_sea_level(effective, config.radius_m());

@@ -57,6 +57,8 @@ A one-layer, latitude-resolved energy balance model is used.
 
 ## 4. Carbon
 
+- A baseline geological outgassing flux (about 3,000 ppm-equivalent per million simulated years in this accelerated model) moves carbon from the geological reservoir to the atmosphere. Weathering is temperature-dependent and nearly stops on a frozen world, so CO₂ accumulates and can eventually break a snowball state.
+
 - Atmospheric CO₂ is well mixed. The UI shows the same value everywhere and says so.
 - Reservoirs: atmosphere, ocean (2.8× initial atmospheric ppm-equivalent), geological (120×), plus explicit `external_ppm` for user additions.
 - Ocean exchange equilibrates toward a temperature-dependent solubility with τ = 280 years, conserving the atmosphere+ocean total.
@@ -81,6 +83,9 @@ A one-layer, latitude-resolved energy balance model is used.
 
 ## 6. Ice
 
+- A global cap keeps land ice at roughly 12% of the total water inventory; thin sea ice remains represented separately. This prevents a numerical snowball collapse in which freezing the shelves exposes more shelf, freezes it, and eventually removes the entire ocean.
+- A slow geothermal/basal melt of thick land ice acts even below 0 °C, so a fully ice-covered world is not a permanent dead end; meltwater returns to the ocean through the sea-level solve.
+
 - Permanent ice thickness grows from snowfall when `T < 0.5 °C` and melts above 0 °C at `0.12 + 0.008T` m/yr.
 - Land ice is capped at 3.5 km; sea ice at 1.5 m. Excess snow becomes runoff.
 - Ice and snow raise albedo to 0.62–0.84, creating the ice–albedo feedback.
@@ -88,6 +93,9 @@ A one-layer, latitude-resolved energy balance model is used.
 - No ice-flow, calving or basal-sliding solver is implemented.
 
 ## 7. Tectonics
+
+- Ocean-floor depth is limited to −12 km and land elevation to +10 km to approximate crustal recycling and erosion; sea level is kept within a stable ±4/8 km numerical envelope. Without these limits, kinematic convergence can excavate unrealistically deep trenches and drive a false sea-level/climate collapse.
+
 
 - 2–24 plates are spherical caps with a seed centre, an Euler pole/axis and an angular speed of 0.002–0.020 rad/Myr. Their centres rotate over time.
 - Cells are assigned to the nearest plate centre; the assignment is recomputed at each tectonic step (nominal cadence 5,000 years).

@@ -38,7 +38,7 @@ Legend: **Implemented** = used by the simulation and exposed in the UI; **Partia
 | Evaporation/precipitation | Implemented | mass-conserving normalised distribution |
 | Soil/runoff/rivers | Implemented | downhill routing, river discharge, diagnostic lakes |
 | Groundwater flow | Planned | soil bucket only |
-| Glacier growth/melt | Implemented | mass-balance approximation |
+| Glacier growth/melt | Implemented | mass-balance approximation, 12% land-ice water cap, geothermal melt, CO₂ outgassing recovery |
 | Ice-sheet flow / calving | Planned | — |
 | Sea level | Implemented | water-budget solver + thermal-expansion offset |
 | Tectonic plates | Partial | kinematic Euler-pole motion and boundary uplift/trenches/erosion |
