@@ -94,7 +94,7 @@ flowchart LR
     STATS --> UI[3-D view, graphs, checkpoints]
 ```
 
-- **Weather and impacts** are evaluated first so aerosols/dust affect the same slice's energy balance.
+- **Catastrophes and impacts** are evaluated before the energy balance so aerosols/dust affect the same slice. Regional weather is applied just after hydrology; its temperature anomalies influence the next slice.
 - **Climate** updates per-cell temperatures from insolation, greenhouse forcing, albedo, aerosols, elevation and ocean heat capacity.
 - **Hydrology** evaporates, precipitates, fills soil, routes runoff downhill, grows/melts snow and ice, and solves sea level from the water budget.
 - **Tectonics** runs on a geological cadence: Euler-pole plate motion, boundary uplift/trenches, volcanism and erosion.
@@ -135,7 +135,7 @@ Volcanoes inject CO₂ from the geological reservoir, aerosols and lava relief. 
 - History samples adapt to the elapsed time scale, so billion-year runs stay bounded.
 - Full-state checkpoints support timeline restore at checkpoint resolution.
 - Saves are versioned **gzip(JSON)** files containing terrain, climate, hydrology, tectonics, RNG state, active forks and history.
-- Save location: `~/Library/Application Support/planetlab.PlanetSimulator/saves` on macOS, and the platform data directory elsewhere.
+- Save location: `~/Library/Application Support/com.planetlab.PlanetSimulator/saves` on macOS, and the platform data directory elsewhere.
 
 ## Architecture
 
