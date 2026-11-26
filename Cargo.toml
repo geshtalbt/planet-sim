@@ -1,0 +1,37 @@
+[package]
+name = "planet_simulator"
+version = "0.1.0"
+edition = "2024"
+description = "Interactive planetary evolution simulator built with Rust and Bevy"
+license = "MIT"
+rust-version = "1.97"
+authors = ["geshtalbt"]
+repository = "https://github.com/geshtalbt/planet-sim"
+homepage = "https://github.com/geshtalbt/planet-sim"
+readme = "README.md"
+keywords = ["bevy", "simulation", "planet", "climate", "procedural"]
+categories = ["games", "simulation"]
+
+[dependencies]
+bevy = "0.20.1"
+bevy_egui = "0.43.1"
+egui = "0.36"
+glam = "0.33"
+rayon = "1.11"
+rand = "0.9"
+rand_chacha = { version = "0.9", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+flate2 = "1"
+directories = "6"
+thiserror = "2"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

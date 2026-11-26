@@ -1,0 +1,4 @@
+/target
+/saves
+*.psim.gz
+.DS_Store
