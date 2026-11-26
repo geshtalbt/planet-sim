@@ -129,3 +129,8 @@ A one-layer, latitude-resolved energy balance model is used.
 - Relativistic or high-energy impact physics beyond the energy scaling above.
 
 The simulator prefers a stable, interconnected, transparent approximation over a visually impressive but disconnected simulation.
+
+
+## 11. Visual orbit and night-side fill
+
+The 3-D view places the planet on a circular orbit around a visible host-star mesh. The orbit is a **readability layer**, not an N-body orbital model: it completes a visual revolution in ~28 real seconds, pauses when the simulation is paused, and is not used by the climate equations. Seasonal climate continues to use simulation time, axial tilt and the model's orbital-phase approximation. A thin orbit line and a faint blue fill light make the orbit and the night hemisphere readable; the fill is a rendering aid and does not add energy to the simulated climate.

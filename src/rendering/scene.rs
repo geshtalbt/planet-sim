@@ -1,6 +1,9 @@
 use bevy::{
+    asset::RenderAssetUsages,
     input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll},
+    mesh::Indices,
     prelude::*,
+    render::render_resource::PrimitiveTopology,
     window::PrimaryWindow,
 };
 use bevy_egui::EguiContexts;
@@ -28,12 +31,44 @@ impl Default for OrbitCameraState {
             target_yaw: 0.35,
             pitch: 0.22,
             target_pitch: 0.22,
-            distance: 2.9,
-            target_distance: 2.9,
+            distance: 3.2,
+            target_distance: 3.2,
             drag_accum: 0.0,
         }
     }
 }
+
+#[derive(Resource)]
+pub struct OrbitalState {
+    pub angle: f32,
+    /// Visual orbital radius in planet-radius units.
+    pub radius: f32,
+    /// Real seconds per visual orbit. The simulation clock drives the climate;
+    /// this is a deliberately readable visual orbit.
+    pub period_seconds: f32,
+}
+
+impl Default for OrbitalState {
+    fn default() -> Self {
+        Self {
+            angle: 0.4,
+            radius: 4.5,
+            period_seconds: 28.0,
+        }
+    }
+}
+
+#[derive(Component)]
+struct SunLight;
+
+#[derive(Component)]
+struct NightFill;
+
+#[derive(Component)]
+struct StarBody;
+
+#[derive(Component)]
+struct OrbitRing;
 
 #[derive(Resource, Default)]
 pub struct PlanetVisual {
@@ -43,6 +78,8 @@ pub struct PlanetVisual {
     pub rivers_mesh: Option<Handle<Mesh>>,
     pub atmosphere_entity: Option<Entity>,
     pub marker_entity: Option<Entity>,
+    pub star_entity: Option<Entity>,
+    pub orbit_entity: Option<Entity>,
     pub last_revision: u64,
     pub last_active: usize,
     pub last_layer: Option<MapLayer>,
@@ -58,11 +95,18 @@ impl Plugin for RenderingPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(ClearColor(Color::srgb(0.003, 0.005, 0.012)))
             .insert_resource(OrbitCameraState::default())
+            .insert_resource(OrbitalState::default())
             .init_resource::<PlanetVisual>()
             .add_systems(Startup, setup_scene)
             .add_systems(
                 Update,
-                (camera_control, ensure_visual, sync_visual)
+                (
+                    update_orbital,
+                    camera_control,
+                    ensure_visual,
+                    sync_visual,
+                    update_sun_light,
+                )
                     .chain()
                     .after(SimulationSet),
             );
@@ -81,18 +125,97 @@ fn setup_scene(
     ));
 
     commands.insert_resource(GlobalAmbientLight {
-        color: Color::srgb(0.55, 0.65, 0.85),
-        brightness: 70.0,
+        color: Color::srgb(0.45, 0.58, 0.82),
+        brightness: 420.0,
         ..default()
     });
     commands.spawn((
-        Name::new("Star light"),
+        Name::new("Stellar light"),
+        SunLight,
         DirectionalLight {
+            color: Color::srgb(1.0, 0.94, 0.82),
             illuminance: 12_000.0,
             shadow_maps_enabled: false,
             ..default()
         },
-        Transform::from_xyz(5.0, 2.5, 4.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Transform::from_xyz(0.0, 0.0, 0.0).looking_at(Vec3::X, Vec3::Y),
+    ));
+    // A faint blue fill reveals the night hemisphere without pretending that
+    // it is daylight. It keeps continents readable on the dark side.
+    commands.spawn((
+        Name::new("Night-side fill light"),
+        NightFill,
+        DirectionalLight {
+            color: Color::srgb(0.30, 0.48, 0.85),
+            illuminance: 4_000.0,
+            shadow_maps_enabled: false,
+            ..default()
+        },
+        Transform::from_xyz(0.0, 0.0, 0.0).looking_at(-Vec3::X, Vec3::Y),
+    ));
+
+    let star_entity = commands
+        .spawn((
+            Name::new("Host star"),
+            StarBody,
+            Mesh3d(meshes.add(Sphere::new(0.30).mesh().ico(4).unwrap())),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: Color::srgb(1.0, 0.82, 0.34),
+                emissive: LinearRgba::rgb(8.0, 4.2, 0.7),
+                unlit: true,
+                ..default()
+            })),
+            Transform::default(),
+            Visibility::Hidden,
+        ))
+        .id();
+
+    let mut orbit_positions = Vec::new();
+    let mut orbit_colors = Vec::new();
+    for i in 0..=192 {
+        let a = i as f32 / 192.0 * std::f32::consts::TAU;
+        orbit_positions.push([4.5 * a.cos(), 0.0, 4.5 * a.sin()]);
+        orbit_colors.push([0.22, 0.56, 0.95, 0.50]);
+    }
+    let mut orbit_mesh = Mesh::new(PrimitiveTopology::LineList, RenderAssetUsages::default());
+    // Convert the closed polyline into line-list pairs.
+    let mut orbit_indices = Vec::new();
+    for i in 0..192u32 {
+        orbit_indices.push(i);
+        orbit_indices.push(i + 1);
+    }
+    orbit_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, orbit_positions);
+    orbit_mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, orbit_colors);
+    orbit_mesh.insert_indices(Indices::U32(orbit_indices));
+    let orbit_entity = commands
+        .spawn((
+            Name::new("Orbit path"),
+            OrbitRing,
+            Mesh3d(meshes.add(orbit_mesh)),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: Color::srgba(0.22, 0.56, 0.95, 0.50),
+                alpha_mode: AlphaMode::Blend,
+                unlit: true,
+                cull_mode: None,
+                ..default()
+            })),
+            Transform::default(),
+            Visibility::Hidden,
+        ))
+        .id();
+
+    // A point light at the star guarantees the correct illuminated hemisphere
+    // independently of directional-light sign conventions.
+    commands.spawn((
+        Name::new("Stellar point light"),
+        PointLight {
+            color: Color::srgb(1.0, 0.92, 0.76),
+            intensity: 4_000_000.0,
+            range: 80.0,
+            shadow_maps_enabled: false,
+            ..default()
+        },
+        Transform::default(),
     ));
 
     // Star field (visual only; not part of the simulation).
@@ -149,8 +272,55 @@ fn setup_scene(
     commands.insert_resource(PlanetVisual {
         atmosphere_entity: Some(atmosphere),
         marker_entity: Some(marker),
+        star_entity: Some(star_entity),
+        orbit_entity: Some(orbit_entity),
         ..default()
     });
+}
+
+fn orbit_position(orbital: &OrbitalState) -> Vec3 {
+    Vec3::new(
+        orbital.angle.cos() * orbital.radius,
+        0.0,
+        orbital.angle.sin() * orbital.radius,
+    )
+}
+
+fn update_orbital(
+    time: Res<Time>,
+    simulation: Res<SimulationRes>,
+    view: Res<ViewState>,
+    mut orbital: ResMut<OrbitalState>,
+) {
+    if view.screen != Screen::Simulation {
+        return;
+    }
+    let Some(sim) = simulation.0.as_ref() else {
+        return;
+    };
+    if sim.time.paused || time.delta_secs() <= 0.0 {
+        return;
+    }
+    orbital.angle = (orbital.angle
+        + time.delta_secs() * std::f32::consts::TAU / orbital.period_seconds)
+        .rem_euclid(std::f32::consts::TAU);
+}
+
+fn update_sun_light(
+    simulation: Res<SimulationRes>,
+    view: Res<ViewState>,
+    orbital: Res<OrbitalState>,
+    mut sun: Single<&mut Transform, (With<SunLight>, Without<NightFill>)>,
+    mut fill: Single<&mut Transform, (With<NightFill>, Without<SunLight>)>,
+) {
+    if view.screen != Screen::Simulation || simulation.0.is_none() {
+        return;
+    }
+    let target = orbit_position(&orbital);
+    if target.length_squared() > 1.0e-4 {
+        **sun = Transform::from_translation(Vec3::ZERO).looking_at(target, Vec3::Y);
+        **fill = Transform::from_translation(-target).looking_at(target, Vec3::Y);
+    }
 }
 
 fn ensure_visual(
@@ -212,6 +382,7 @@ fn sync_visual(
     mut commands: Commands,
     simulation: Res<SimulationRes>,
     view: Res<ViewState>,
+    orbital: Res<OrbitalState>,
     mut visual: ResMut<PlanetVisual>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
@@ -227,7 +398,22 @@ fn sync_visual(
     let Some(planet_entity) = visual.planet_entity else {
         return;
     };
-    commands.entity(planet_entity).insert(Visibility::Visible);
+    let planet_position = orbit_position(&orbital);
+    commands.entity(planet_entity).insert((
+        Visibility::Visible,
+        Transform::from_translation(planet_position),
+    ));
+    if let Some(entity) = visual.rivers_entity {
+        commands
+            .entity(entity)
+            .insert(Transform::from_translation(planet_position));
+    }
+    if let Some(entity) = visual.star_entity {
+        commands.entity(entity).insert(Visibility::Visible);
+    }
+    if let Some(entity) = visual.orbit_entity {
+        commands.entity(entity).insert(Visibility::Visible);
+    }
 
     let cell_count_changed = visual.last_cell_count != planet.grid.cell_count();
     let rebuild = visual.force_rebuild
@@ -283,7 +469,7 @@ fn sync_visual(
             } else {
                 Visibility::Hidden
             },
-            Transform::from_scale(Vec3::splat(scale)),
+            Transform::from_translation(planet_position).with_scale(Vec3::splat(scale)),
         ));
     }
 
@@ -291,7 +477,7 @@ fn sync_visual(
         if let Some(cell) = view.selected_cell.filter(|c| *c < planet.grid.cell_count()) {
             let radius =
                 crate::rendering::surface_radius(planet, cell, view.elevation_exaggeration) * 1.012;
-            let pos = planet.grid.direction(cell) * radius;
+            let pos = planet_position + planet.grid.direction(cell) * radius;
             commands.entity(marker).insert((
                 Transform::from_translation(pos).with_scale(Vec3::splat(0.013)),
                 Visibility::Visible,
@@ -308,6 +494,8 @@ fn hide_visual(commands: &mut Commands, visual: &PlanetVisual) {
         visual.rivers_entity,
         visual.atmosphere_entity,
         visual.marker_entity,
+        visual.star_entity,
+        visual.orbit_entity,
     ]
     .into_iter()
     .flatten()
@@ -325,6 +513,7 @@ fn camera_control(
     window: Single<&Window, With<PrimaryWindow>>,
     mut view: ResMut<ViewState>,
     simulation: Res<SimulationRes>,
+    orbital: Res<OrbitalState>,
     mut contexts: EguiContexts,
     time: Res<Time>,
 ) -> Result {
@@ -352,12 +541,17 @@ fn camera_control(
     orbit.pitch += (orbit.target_pitch - orbit.pitch) * smooth;
     orbit.distance += (orbit.target_distance - orbit.distance) * smooth;
     let cos_pitch = orbit.pitch.cos();
-    let position = Vec3::new(
+    let target = if simulation.0.is_some() {
+        orbit_position(&orbital)
+    } else {
+        Vec3::ZERO
+    };
+    let offset = Vec3::new(
         orbit.yaw.sin() * cos_pitch,
         orbit.pitch.sin(),
         orbit.yaw.cos() * cos_pitch,
     ) * orbit.distance;
-    **transform = Transform::from_translation(position).looking_at(Vec3::ZERO, Vec3::Y);
+    **transform = Transform::from_translation(target + offset).looking_at(target, Vec3::Y);
 
     if buttons.just_released(MouseButton::Left)
         && !pointer_over_ui
@@ -368,15 +562,19 @@ fn camera_control(
         if let Ok(ray) = camera.viewport_to_world(&global, cursor) {
             let origin = ray.origin;
             let direction = ray.direction;
-            let b = origin.dot(*direction);
-            let c = origin.length_squared() - 1.0;
+            let to_center = origin - target;
+            let b = to_center.dot(*direction);
+            let c = to_center.length_squared() - 1.0;
             let disc = b * b - c;
             if disc > 0.0 {
                 let t = -b - disc.sqrt();
                 if t > 0.0 {
                     let point = origin + direction * t;
                     if let Some(sim) = simulation.0.as_ref() {
-                        let cell = sim.active_planet().grid.nearest_cell(point.normalize());
+                        let cell = sim
+                            .active_planet()
+                            .grid
+                            .nearest_cell((point - target).normalize());
                         view.selected_cell = Some(cell);
                     }
                 }
