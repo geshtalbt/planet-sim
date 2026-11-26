@@ -15,6 +15,7 @@ pub mod climate;
 pub mod experiments;
 pub mod history;
 pub mod hydrology;
+pub mod localization;
 pub mod planet_generator;
 pub mod planetary_physics;
 pub mod rendering;

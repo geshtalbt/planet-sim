@@ -1,5 +1,6 @@
 //! Data-driven map layers and their colour scales.
 
+use crate::localization::tr;
 use crate::simulation::PlanetState;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -41,7 +42,7 @@ impl MapLayer {
     ];
 
     pub fn label(self) -> &'static str {
-        match self {
+        tr(match self {
             Self::Natural => "Natural appearance",
             Self::Elevation => "Elevation",
             Self::Temperature => "Temperature",
@@ -57,7 +58,7 @@ impl MapLayer {
             Self::Albedo => "Surface albedo",
             Self::Co2 => "Atmospheric CO₂",
             Self::Geology => "Geological activity",
-        }
+        })
     }
 
     pub fn unit(self) -> &'static str {
@@ -69,8 +70,8 @@ impl MapLayer {
             Self::Pressure => "kPa",
             Self::Albedo => "0–1",
             Self::Co2 => "ppm",
-            Self::Ice => "m ice",
-            Self::Volcanism | Self::Geology => "activity",
+            Self::Ice => tr("m ice"),
+            Self::Volcanism | Self::Geology => tr("activity"),
             _ => "",
         }
     }

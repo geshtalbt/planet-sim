@@ -1,6 +1,7 @@
 use bevy_egui::egui;
 
 use crate::history::History;
+use crate::localization::{tr, translated};
 use crate::rendering::MapLayer;
 use crate::simulation::PlanetState;
 use crate::ui::{ChartMetric, format_compact, muted};
@@ -9,7 +10,7 @@ pub fn draw_legend(ui: &mut egui::Ui, layer: MapLayer, planet: &PlanetState) {
     match layer {
         MapLayer::Natural => {
             ui.label(
-                egui::RichText::new("Surface type")
+                egui::RichText::new(tr("Surface type"))
                     .size(10.0)
                     .color(muted()),
             );
@@ -25,7 +26,7 @@ pub fn draw_legend(ui: &mut egui::Ui, layer: MapLayer, planet: &PlanetState) {
                         ui.allocate_exact_size(egui::vec2(12.0, 12.0), egui::Sense::hover());
                     ui.painter()
                         .rect_filled(rect, egui::CornerRadius::same(2), rgb(color));
-                    ui.label(egui::RichText::new(label).size(10.0));
+                    ui.label(egui::RichText::new(translated(label)).size(10.0));
                 });
             }
         }
@@ -46,14 +47,14 @@ pub fn draw_legend(ui: &mut egui::Ui, layer: MapLayer, planet: &PlanetState) {
                         ui.allocate_exact_size(egui::vec2(12.0, 12.0), egui::Sense::hover());
                     ui.painter()
                         .rect_filled(rect, egui::CornerRadius::same(2), rgb(biome.color()));
-                    ui.label(egui::RichText::new(label).size(10.0));
+                    ui.label(egui::RichText::new(translated(label)).size(10.0));
                 });
             }
         }
         MapLayer::Tectonics => {
             ui.label(
                 egui::RichText::new(
-                    "Colours identify plates; pale cells lie on a boundary. Boundaries are recomputed from the simulated plate assignment.",
+                    tr("Colours identify plates; pale cells lie on a boundary. Boundaries are recomputed from the simulated plate assignment."),
                 )
                 .size(10.0)
                 .color(muted()),
@@ -61,15 +62,15 @@ pub fn draw_legend(ui: &mut egui::Ui, layer: MapLayer, planet: &PlanetState) {
         }
         MapLayer::Volcanism => {
             ui.label(
-                egui::RichText::new("Black = quiet · orange = active · pale = recent lava")
+                egui::RichText::new(tr("Black = quiet · orange = active · pale = recent lava"))
                     .size(10.0)
                     .color(muted()),
             );
-            draw_gradient(ui, layer, 0.0, 1.0, "activity");
+            draw_gradient(ui, layer, 0.0, 1.0, tr("activity"));
         }
         MapLayer::Geology => {
             ui.label(
-                egui::RichText::new("Elevation tint plus volcanic/seismic heat overlay")
+                egui::RichText::new(tr("Elevation tint plus volcanic/seismic heat overlay"))
                     .size(10.0)
                     .color(muted()),
             );
@@ -82,9 +83,9 @@ pub fn draw_legend(ui: &mut egui::Ui, layer: MapLayer, planet: &PlanetState) {
     }
     if layer == MapLayer::Co2 {
         ui.label(
-            egui::RichText::new(
+            egui::RichText::new(tr(
                 "CO₂ is treated as well mixed; this layer is intentionally uniform.",
-            )
+            ))
             .size(9.5)
             .color(muted()),
         );
@@ -92,7 +93,8 @@ pub fn draw_legend(ui: &mut egui::Ui, layer: MapLayer, planet: &PlanetState) {
     if layer == MapLayer::Temperature {
         ui.label(
             egui::RichText::new(format!(
-                "Current global mean: {:.1} °C",
+                "{}: {:.1} °C",
+                tr("Current global mean"),
                 planet.stats.mean_temp_c
             ))
             .size(10.0)
@@ -191,7 +193,7 @@ pub fn draw_multi_chart(
         painter.text(
             rect.center(),
             egui::Align2::CENTER_CENTER,
-            "No history yet",
+            crate::localization::pick("No history yet", "История пока пуста"),
             egui::FontId::proportional(11.0),
             muted(),
         );
@@ -359,7 +361,17 @@ fn format_axis_value(value: f64, unit: &str) -> String {
 }
 
 fn format_axis_time(years: f64) -> String {
-    if years.abs() >= 1.0e9 {
+    if crate::localization::is_russian() {
+        if years.abs() >= 1.0e9 {
+            format!("{:.2} млрд лет", years / 1.0e9)
+        } else if years.abs() >= 1.0e6 {
+            format!("{:.2} млн лет", years / 1.0e6)
+        } else if years.abs() >= 1.0e3 {
+            format!("{:.1} тыс. лет", years / 1.0e3)
+        } else {
+            format!("{years:.1} лет")
+        }
+    } else if years.abs() >= 1.0e9 {
         format!("{:.2} Gyr", years / 1.0e9)
     } else if years.abs() >= 1.0e6 {
         format!("{:.2} Myr", years / 1.0e6)

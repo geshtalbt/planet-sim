@@ -14,6 +14,7 @@ use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
 
 use crate::atmosphere::AtmosphereState;
+use crate::localization::tr;
 use crate::terrain::{Biome, PlanetGrid};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -49,7 +50,7 @@ impl WeatherKind {
     ];
 
     pub fn label(self) -> &'static str {
-        match self {
+        tr(match self {
             Self::Rain => "Rain",
             Self::Snow => "Snow",
             Self::Hail => "Hail",
@@ -62,7 +63,7 @@ impl WeatherKind {
             Self::Sandstorm => "Sandstorm",
             Self::DustStorm => "Dust storm",
             Self::Wildfire => "Wildfire",
-        }
+        })
     }
 
     pub fn is_severe(self) -> bool {

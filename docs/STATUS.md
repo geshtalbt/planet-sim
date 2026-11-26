@@ -68,11 +68,12 @@ Legend: **Implemented** = used by the simulation and exposed in the UI; **Partia
 | Planet history | Implemented as a panel |
 | Saved planets | Implemented as a panel |
 | Application settings | Implemented as a panel (subset) |
+| Russian UI / README | Implemented | Top bar, main menu and settings language switch; `README.ru.md` |
 | Graphs | Implemented (temperature, CO₂, sea level, ice, land, precipitation, pressure, albedo, tilt, solar, water, eruptions, magnetic) |
 | Parameter initial/current/deviation | Implemented for main physics controls |
 | Direct region inspection | Implemented |
 | Side-by-side 3-D comparison | Planned |
-| Internationalisation | Planned (UI is English) |
+| Internationalisation | Implemented | UI language switch English/Русский, system `LANG` detection, Russian README; free-form historical descriptions may retain the language in which they were recorded |
 
 ## Known correctness constraints
 

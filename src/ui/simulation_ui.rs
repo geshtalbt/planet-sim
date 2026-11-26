@@ -3,6 +3,7 @@ use bevy_egui::egui;
 
 use crate::app::{Screen, ViewState};
 use crate::history::EventKind;
+use crate::localization::{pick, tr, translated};
 use crate::simulation::{Simulation, format_age};
 use crate::time_engine::SPEED_PRESETS;
 use crate::ui::{UiState, accent, danger, muted, widgets};
@@ -26,7 +27,7 @@ fn top_bar(root: &mut egui::Ui, state: &mut UiState, view: &mut ViewState, sim: 
     egui::Panel::top("sim_top").show(root, |ui| {
         ui.add_space(3.0);
         ui.horizontal(|ui| {
-            if ui.button("☰ Menu").clicked() {
+            if ui.button(tr("☰ Menu")).clicked() {
                 sim.time.paused = true;
                 view.screen = Screen::MainMenu;
             }
@@ -39,51 +40,79 @@ fn top_bar(root: &mut egui::Ui, state: &mut UiState, view: &mut ViewState, sim: 
             );
             ui.label(
                 egui::RichText::new(format!(
-                    "age {} · {}",
+                    "{} {} · {}",
+                    tr("age"),
                     format_age(sim.active_planet().time_years),
-                    if sim.time.paused { "paused" } else { "running" }
+                    if sim.time.paused {
+                        tr("paused")
+                    } else {
+                        tr("running")
+                    }
                 ))
                 .size(12.0)
                 .color(if sim.time.paused { muted() } else { accent() }),
             );
             ui.separator();
-            if ui.button("Planetary physics").clicked() {
+            if ui.button(tr("Planetary physics")).clicked() {
                 state.show_physics = true;
             }
-            if ui.button("Catastrophes").clicked() {
+            if ui.button(tr("Catastrophes")).clicked() {
                 state.show_catastrophes = true;
             }
-            if ui.button("Statistics").clicked() {
+            if ui.button(tr("Statistics")).clicked() {
                 state.show_statistics = true;
             }
-            if ui.button("History").clicked() {
+            if ui.button(tr("History")).clicked() {
                 state.show_history = true;
             }
-            if ui.button("What If?").clicked() {
+            if ui.button(tr("What If?")).clicked() {
                 state.show_experiments = true;
             }
-            if ui.button("Saves").clicked() {
+            if ui.button(tr("Saves")).clicked() {
                 state.show_saves = true;
                 crate::ui::refresh_saves(state);
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button("Settings").clicked() {
+                let target = match state.language {
+                    crate::localization::Language::English => "RU",
+                    crate::localization::Language::Russian => "EN",
+                };
+                if ui
+                    .button(target)
+                    .on_hover_text(tr("Language / Язык"))
+                    .clicked()
+                {
+                    state.language = match state.language {
+                        crate::localization::Language::English => {
+                            crate::localization::Language::Russian
+                        }
+                        crate::localization::Language::Russian => {
+                            crate::localization::Language::English
+                        }
+                    };
+                    crate::localization::set_language(state.language);
+                }
+                if ui.button(tr("Settings")).clicked() {
                     state.show_settings = true;
                 }
-                if ui.button("?").clicked() {
+                if ui.button(tr("?")).clicked() {
                     state.show_help = true;
                 }
                 if let Some((message, is_error)) = &state.status {
-                    ui.label(egui::RichText::new(message).size(10.5).color(if *is_error {
-                        danger()
-                    } else {
-                        accent()
-                    }));
+                    ui.label(
+                        egui::RichText::new(translated(message))
+                            .size(10.5)
+                            .color(if *is_error { danger() } else { accent() }),
+                    );
                 }
             });
         });
         if let Some(notice) = sim.notices.last() {
-            ui.label(egui::RichText::new(notice).size(10.0).color(muted()));
+            ui.label(
+                egui::RichText::new(translated(notice))
+                    .size(10.0)
+                    .color(muted()),
+            );
         }
     });
 }
@@ -101,36 +130,36 @@ fn bottom_bar(
                 .add_sized(
                     [74.0, 30.0],
                     egui::Button::new(if sim.time.paused {
-                        "▶ Run"
+                        tr("▶ Run")
                     } else {
-                        "⏸ Pause"
+                        tr("⏸ Pause")
                     }),
                 )
                 .clicked()
             {
                 sim.time.paused = !sim.time.paused;
             }
-            if ui.button("− speed").clicked() {
+            if ui.button(tr("− speed")).clicked() {
                 sim.time.slower();
             }
             egui::ComboBox::from_id_salt("speed_presets")
                 .width(170.0)
-                .selected_text(SPEED_PRESETS[sim.time.speed_preset].0)
+                .selected_text(translated(SPEED_PRESETS[sim.time.speed_preset].0))
                 .show_ui(ui, |ui| {
                     for (index, (label, _)) in SPEED_PRESETS.iter().enumerate() {
                         if ui
-                            .selectable_label(sim.time.speed_preset == index, *label)
+                            .selectable_label(sim.time.speed_preset == index, translated(label))
                             .clicked()
                         {
                             sim.time.set_preset(index);
                         }
                     }
                 });
-            if ui.button("+ speed").clicked() {
+            if ui.button(tr("+ speed")).clicked() {
                 sim.time.faster();
             }
             ui.separator();
-            ui.label("Step");
+            ui.label(tr("Step"));
             ui.add(
                 egui::DragValue::new(&mut state.step_amount)
                     .speed(1.0)
@@ -139,24 +168,28 @@ fn bottom_bar(
             egui::ComboBox::from_id_salt("step_unit")
                 .width(100.0)
                 .selected_text(if state.step_unit_is_years {
-                    "years"
+                    tr("years")
                 } else {
-                    "million yr"
+                    tr("million yr")
                 })
                 .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut state.step_unit_is_years, true, "years");
-                    ui.selectable_value(&mut state.step_unit_is_years, false, "million yr");
+                    ui.selectable_value(&mut state.step_unit_is_years, true, tr("years"));
+                    ui.selectable_value(&mut state.step_unit_is_years, false, tr("million yr"));
                 });
-            if ui.button("Advance").clicked() {
+            if ui.button(tr("Advance")).clicked() {
                 let years =
                     state.step_amount as f64 * if state.step_unit_is_years { 1.0 } else { 1.0e6 };
                 sim.time.queue_years(years);
                 state.status = Some((
-                    format!("Queued {} of simulation time.", format_age(years)),
+                    format!(
+                        "{} {}.",
+                        pick("Queued simulation time:", "В очередь добавлено:"),
+                        format_age(years)
+                    ),
                     false,
                 ));
             }
-            if ui.button("Checkpoint now").clicked() {
+            if ui.button(tr("Checkpoint now")).clicked() {
                 let label = format_age(sim.main.planet.time_years);
                 sim.push_checkpoint(label);
                 state.status = Some(("Checkpoint stored.".into(), false));
@@ -166,7 +199,7 @@ fn bottom_bar(
                     egui::RichText::new(format!(
                         "{:.2}x · {}",
                         sim.time.speed_years_per_second,
-                        sim.time.preset_label()
+                        translated(sim.time.preset_label())
                     ))
                     .size(12.0)
                     .monospace()
@@ -197,16 +230,17 @@ fn bottom_bar(
                 egui::ProgressBar::new(fraction)
                     .desired_width((ui.available_width() - 320.0).max(120.0))
                     .text(format!(
-                        "{} → {} · {} checkpoint(s)",
+                        "{} — {} · {} {}",
                         format_age(start),
                         format_age(age),
-                        sim.checkpoints.len()
+                        sim.checkpoints.len(),
+                        tr("checkpoint(s)")
                     )),
             );
-            if ui.button("Timeline / checkpoints").clicked() {
+            if ui.button(tr("Timeline / checkpoints")).clicked() {
                 state.show_history = true;
             }
-            if ui.button("Restart").clicked() {
+            if ui.button(tr("Restart")).clicked() {
                 state.confirm_restart = true;
                 state.show_settings = true;
             }
@@ -229,7 +263,7 @@ fn left_panel(
             egui::ScrollArea::vertical().show(ui, |ui| {
                 ui.add_space(4.0);
                 ui.label(
-                    egui::RichText::new("VISUALISATION LAYERS")
+                    egui::RichText::new(tr("VISUALISATION LAYERS"))
                         .size(11.0)
                         .strong()
                         .color(accent()),
@@ -244,28 +278,28 @@ fn left_panel(
                 }
                 ui.separator();
                 ui.label(
-                    egui::RichText::new("VIEW")
+                    egui::RichText::new(tr("VIEW"))
                         .size(11.0)
                         .strong()
                         .color(accent()),
                 );
-                ui.checkbox(&mut view.show_rivers, "Rivers and flow lines");
-                ui.checkbox(&mut view.show_clouds, "Cloud veil (surface shading)");
-                ui.checkbox(&mut view.show_atmosphere, "Atmosphere shell");
+                ui.checkbox(&mut view.show_rivers, tr("Rivers and flow lines"));
+                ui.checkbox(&mut view.show_clouds, tr("Cloud veil (surface shading)"));
+                ui.checkbox(&mut view.show_atmosphere, tr("Atmosphere shell"));
                 ui.add(
                     egui::Slider::new(&mut view.elevation_exaggeration, 0.0..=80.0)
-                        .text("Elevation exaggeration"),
+                        .text(tr("Elevation exaggeration")),
                 );
                 ui.label(
-                    egui::RichText::new(
+                    egui::RichText::new(tr(
                         "Render displacement only. Stored elevations remain real metres.",
-                    )
+                    ))
                     .size(9.5)
                     .color(muted()),
                 );
                 ui.separator();
                 ui.label(
-                    egui::RichText::new("LEGEND")
+                    egui::RichText::new(tr("LEGEND"))
                         .size(11.0)
                         .strong()
                         .color(accent()),
@@ -276,9 +310,12 @@ fn left_panel(
                     if cell < sim.active_planet().grid.cell_count() {
                         ui.label(
                             egui::RichText::new(format!(
-                                "Selected cell #{cell}\n{:.1}° lat, {:.1}° lon",
+                                "{} #{cell}\n{:.1}° {}, {:.1}° {}",
+                                tr("Selected cell"),
                                 sim.active_planet().grid.lat_deg(cell),
-                                sim.active_planet().grid.lon_deg(cell)
+                                pick("lat", "шир."),
+                                sim.active_planet().grid.lon_deg(cell),
+                                pick("lon", "долг.")
                             ))
                             .size(10.5)
                             .color(muted()),
@@ -286,7 +323,7 @@ fn left_panel(
                     }
                 } else {
                     ui.label(
-                        egui::RichText::new("Click the planet to inspect a region.")
+                        egui::RichText::new(tr("Click the planet to inspect a region."))
                             .size(10.5)
                             .color(muted()),
                     );
@@ -311,7 +348,7 @@ fn right_panel(
                 ui.add_space(4.0);
                 let stats = sim.active_planet().stats.clone();
                 let planet = sim.active_planet();
-                ui.label(egui::RichText::new("PLANET STATE").size(11.0).strong().color(accent()));
+                ui.label(egui::RichText::new(tr("PLANET STATE")).size(11.0).strong().color(accent()));
                 egui::Grid::new("quick_stats")
                     .num_columns(2)
                     .spacing([12.0, 4.0])
@@ -331,15 +368,17 @@ fn right_panel(
                     });
                 ui.label(
                     egui::RichText::new(format!(
-                        "Dominant biome: {} · greenhouse g {:.3}",
+                        "{}: {} · {} {:.3}",
+                        tr("Dominant biome"),
                         sim.active_planet().dominant_biome().name(),
+                        tr("greenhouse g"),
                         stats.greenhouse_strength
                     ))
                     .size(10.0)
                     .color(muted()),
                 );
                 ui.separator();
-                ui.label(egui::RichText::new("SELECTED REGION").size(11.0).strong().color(accent()));
+                ui.label(egui::RichText::new(tr("SELECTED REGION")).size(11.0).strong().color(accent()));
                 let cell = view
                     .selected_cell
                     .filter(|&c| c < planet.grid.cell_count());
@@ -348,9 +387,12 @@ fn right_panel(
                     let sea = planet.sea_level_m();
                     ui.label(
                         egui::RichText::new(format!(
-                            "{:.1}° lat · {:.1}° lon · cell {}",
+                            "{:.1}° {} · {:.1}° {} · {} {}",
                             planet.grid.lat_deg(cell),
+                            pick("lat", "шир."),
                             planet.grid.lon_deg(cell),
+                            pick("lon", "долг."),
+                            tr("cell"),
                             cell
                         ))
                         .size(10.5)
@@ -384,55 +426,55 @@ fn right_panel(
                             region(ui, "Local dT", format!("{:+.1} °C", c.temp_offset_c));
                         });
                     ui.horizontal_wrapped(|ui| {
-                        if ui.small_button("Warm +5 °C").clicked() {
+                        if ui.small_button(tr("Warm +5 °C")).clicked() {
                             local_action = Some(LocalAction::Warm(cell, 5.0));
                         }
-                        if ui.small_button("Cool −5 °C").clicked() {
+                        if ui.small_button(tr("Cool −5 °C")).clicked() {
                             local_action = Some(LocalAction::Warm(cell, -5.0));
                         }
-                        if ui.small_button("Rain 100 mm").clicked() {
+                        if ui.small_button(tr("Rain 100 mm")).clicked() {
                             local_action = Some(LocalAction::Rain(cell, 100.0));
                         }
-                        if ui.small_button("Drought").clicked() {
+                        if ui.small_button(tr("Drought")).clicked() {
                             local_action = Some(LocalAction::Drought(cell));
                         }
-                        if ui.small_button("Add lake 5 m").clicked() {
+                        if ui.small_button(tr("Add lake 5 m")).clicked() {
                             local_action = Some(LocalAction::Lake(cell, 5.0));
                         }
-                        if ui.small_button("Volcano").clicked() {
+                        if ui.small_button(tr("Volcano")).clicked() {
                             local_action = Some(LocalAction::Volcano(cell));
                         }
                     });
-                    if ui.small_button("Clear persistent local forcing").clicked() {
+                    if ui.small_button(tr("Clear persistent local forcing")).clicked() {
                         local_action = Some(LocalAction::ResetForcing(cell));
                     }
                     ui.label(
                         egui::RichText::new(
-                            "Temperature offsets are persistent; rainfall, lakes and volcanoes modify the stored regional state.",
+                            tr("Temperature offsets are persistent; rainfall, lakes and volcanoes modify the stored regional state."),
                         )
                         .size(9.5)
                         .color(muted()),
                     );
                 } else {
                     ui.label(
-                        egui::RichText::new("No region selected. Click the planet surface.")
+                        egui::RichText::new(tr("No region selected. Click the planet surface."))
                             .size(10.5)
                             .color(muted()),
                     );
                 }
                 ui.separator();
-                ui.label(egui::RichText::new("RECENT EVENTS").size(11.0).strong().color(accent()));
+                ui.label(egui::RichText::new(tr("RECENT EVENTS")).size(11.0).strong().color(accent()));
                 let mut events: Vec<_> = sim.active_history().events.iter().rev().take(6).cloned().collect();
                 events.reverse();
                 if events.is_empty() {
-                    ui.label(egui::RichText::new("No events yet.").size(10.5).color(muted()));
+                    ui.label(egui::RichText::new(tr("No events yet.")).size(10.5).color(muted()));
                 }
                 for event in events {
                     ui.label(
                         egui::RichText::new(format!(
                             "{} · {}",
                             format_age(event.time_years),
-                            event.title
+                            translated(&event.title)
                         ))
                         .size(10.0)
                         .color(if matches!(event.kind, EventKind::Catastrophe(_)) {
@@ -451,20 +493,35 @@ fn right_panel(
                 sim.active_planet_mut()
                     .adjust_local_temperature(cell, delta);
                 Some(format!(
-                    "Local temperature offset changed by {delta:+.1} °C."
+                    "{} {delta:+.1} °C.",
+                    pick(
+                        "Local temperature offset changed by",
+                        "Локальное смещение температуры изменено на"
+                    )
                 ))
             }
             LocalAction::Rain(cell, mm) => {
                 sim.active_planet_mut().add_local_rain(cell, mm);
-                Some(format!("Added {mm:.0} mm of local rainfall."))
+                Some(format!(
+                    "{} {mm:.0} {}.",
+                    pick("Added", "Добавлено"),
+                    pick("mm of local rainfall", "мм локальных осадков")
+                ))
             }
             LocalAction::Drought(cell) => {
                 sim.active_planet_mut().add_local_drought(cell, 0.8);
-                Some("Applied a local drought.".into())
+                Some(pick("Applied a local drought.", "Применена локальная засуха.").to_string())
             }
             LocalAction::Lake(cell, depth) => {
                 sim.active_planet_mut().add_local_water(cell, depth);
-                Some(format!("Local lake depth increased by {depth:.1} m."))
+                Some(format!(
+                    "{} {depth:.1} {}.",
+                    pick(
+                        "Local lake depth increased by",
+                        "Глубина локального озера увеличена на"
+                    ),
+                    pick("m", "м")
+                ))
             }
             LocalAction::Volcano(cell) => {
                 let outcome = sim.active_planet_mut().trigger_volcano(cell, 6.0, 20.0);
@@ -481,7 +538,7 @@ fn right_panel(
                     c.transient_heat_c = 0.0;
                 }
                 sim.active_planet_mut().revision += 1;
-                Some("Local forcing cleared.".into())
+                Some(pick("Local forcing cleared.", "Локальное воздействие сброшено.").to_string())
             }
         };
         if let Some(message) = outcome {
@@ -500,13 +557,21 @@ enum LocalAction {
 }
 
 fn stat(ui: &mut egui::Ui, label: &str, value: String) {
-    ui.label(egui::RichText::new(label).size(10.5).color(muted()));
+    ui.label(
+        egui::RichText::new(translated(label))
+            .size(10.5)
+            .color(muted()),
+    );
     ui.label(egui::RichText::new(value).size(11.5).monospace());
     ui.end_row();
 }
 
 fn region(ui: &mut egui::Ui, label: &str, value: String) {
-    ui.label(egui::RichText::new(label).size(10.5).color(muted()));
+    ui.label(
+        egui::RichText::new(translated(label))
+            .size(10.5)
+            .color(muted()),
+    );
     ui.label(egui::RichText::new(value).size(11.0));
     ui.end_row();
 }

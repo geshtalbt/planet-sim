@@ -664,7 +664,19 @@ fn step_event(kind: EventKind, title: String, description: String) -> StepEvent 
 /// Human-readable age with unit switching. Uses a fixed calendar year.
 pub fn format_age(years: f64) -> String {
     let y = years.max(0.0);
-    if y < 1.0 {
+    if crate::localization::language() == crate::localization::Language::Russian {
+        if y < 1.0 {
+            format!("{:.1} дн.", y * 365.25)
+        } else if y < 1_000.0 {
+            format!("{y:.1} лет")
+        } else if y < 1.0e6 {
+            format!("{:.2} тыс. лет", y / 1_000.0)
+        } else if y < 1.0e9 {
+            format!("{:.3} млн лет", y / 1.0e6)
+        } else {
+            format!("{:.3} млрд лет", y / 1.0e9)
+        }
+    } else if y < 1.0 {
         format!("{:.1} days", y * 365.25)
     } else if y < 1_000.0 {
         format!("{y:.1} years")

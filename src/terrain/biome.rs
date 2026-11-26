@@ -5,6 +5,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::localization::tr;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Biome {
     Ocean,
@@ -24,7 +26,7 @@ pub enum Biome {
 
 impl Biome {
     pub fn name(self) -> &'static str {
-        match self {
+        tr(match self {
             Self::Ocean => "Ocean",
             Self::Lake => "Lake",
             Self::TropicalRainforest => "Tropical rainforest",
@@ -38,7 +40,7 @@ impl Biome {
             Self::Tundra => "Tundra",
             Self::PolarDesert => "Polar desert",
             Self::IceSheet => "Permanent ice sheet",
-        }
+        })
     }
 
     /// Typical clear-sky surface albedo.

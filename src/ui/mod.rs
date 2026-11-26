@@ -10,6 +10,7 @@ use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 
 use crate::app::{Screen, SimulationRes, ViewState};
+use crate::localization::{self, Language, tr};
 use crate::planet_generator::PlanetConfig;
 use crate::rendering::PlanetVisual;
 use crate::save_system::{SaveManager, SaveMeta};
@@ -51,7 +52,7 @@ impl ChartMetric {
     ];
 
     pub fn label(self) -> &'static str {
-        match self {
+        tr(match self {
             Self::Temperature => "Global mean temperature",
             Self::OceanTemperature => "Ocean temperature",
             Self::Co2 => "Atmospheric CO₂",
@@ -66,7 +67,7 @@ impl ChartMetric {
             Self::Water => "Total water inventory",
             Self::Eruptions => "Active eruptions",
             Self::MagneticField => "Magnetic field",
-        }
+        })
     }
 
     pub fn unit(self) -> &'static str {
@@ -74,14 +75,14 @@ impl ChartMetric {
             Self::Temperature | Self::OceanTemperature => "°C",
             Self::Co2 => "ppm",
             Self::SeaLevel => "m",
-            Self::Ice | Self::Land | Self::Albedo => "fraction",
+            Self::Ice | Self::Land | Self::Albedo => tr("fraction"),
             Self::Precipitation => "mm/yr",
             Self::Pressure => "kPa",
             Self::Solar => "×",
             Self::AxialTilt => "°",
             Self::Water => "km³",
-            Self::Eruptions => "count",
-            Self::MagneticField => "relative",
+            Self::Eruptions => tr("count"),
+            Self::MagneticField => tr("relative"),
         }
     }
 
@@ -126,6 +127,7 @@ impl ChartMetric {
 
 #[derive(Resource)]
 pub struct UiState {
+    pub language: Language,
     pub creation: PlanetConfig,
     pub creation_preset: String,
     pub status: Option<(String, bool)>,
@@ -181,6 +183,7 @@ impl Default for UiState {
     fn default() -> Self {
         let demo_ui = std::env::var("PLANET_UI").unwrap_or_default();
         Self {
+            language: Language::detect(),
             creation: PlanetConfig::default(),
             creation_preset: "Earthlike".into(),
             status: None,
@@ -246,6 +249,7 @@ fn draw_ui(
     mut app_exit: MessageWriter<AppExit>,
 ) -> Result {
     let ctx = contexts.ctx_mut()?;
+    localization::set_language(state.language);
     if !state.theme_initialized {
         apply_theme(ctx);
         state.theme_initialized = true;
@@ -272,7 +276,13 @@ fn draw_ui(
                 state.save_name = sim.main.planet.config.name.clone();
                 state.co2_edit = sim.main.planet.atmosphere.co2_ppm;
                 state.water_edit = sim.main.planet.hydrology.total_water_km3;
-                state.status = Some((format!("Loaded '{name}'."), false));
+                state.status = Some((
+                    format!(
+                        "{} '{name}'.",
+                        crate::localization::pick("Loaded", "Загружено")
+                    ),
+                    false,
+                ));
                 simulation.0 = Some(sim);
                 view.screen = Screen::Simulation;
                 view.selected_cell = None;
@@ -349,9 +359,9 @@ fn draw_missing_simulation(root: &mut egui::Ui, state: &mut UiState, view: &mut 
     egui::CentralPanel::default().show(root, |ui| {
         ui.vertical_centered(|ui| {
             ui.add_space(100.0);
-            ui.heading("No simulation loaded");
-            ui.label("The selected screen requires an active planet.");
-            if ui.button("Back to main menu").clicked() {
+            ui.heading(tr("No simulation loaded"));
+            ui.label(tr("The selected screen requires an active planet."));
+            if ui.button(tr("Back to main menu")).clicked() {
                 view.screen = Screen::MainMenu;
                 state.status = None;
             }

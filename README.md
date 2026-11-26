@@ -1,5 +1,7 @@
 # Planet Simulator
 
+**English** · [Русский](README.ru.md)
+
 **A coupled planetary evolution laboratory in Rust + Bevy.** Create a world from a seed, configure its atmosphere, water budget, orbit and geology, then watch climate, oceans, ice, rivers and tectonic plates evolve over years to billions of years.
 
 ![Rust](https://img.shields.io/badge/Rust-1.97%2B-orange)
@@ -51,6 +53,7 @@ PLANET_DEMO=1 cargo run          # skip the menu: Earthlike planet, simulation r
 PLANET_SCREEN=creation cargo run # open the planet creation screen
 PLANET_UI=physics cargo run      # open a specific panel (physics, statistics,
                                  # catastrophes, history, saves, experiments)
+LANG=ru_RU.UTF-8 cargo run       # start with the Russian UI
 ```
 
 The first run opens the **main menu**. Choose **New planet**, adjust the parameters (or press **Randomise all** / **Generate planet**), and the simulation starts. The default Earthlike preset uses an icosphere with 10,242 cells.
@@ -165,6 +168,10 @@ The simulation core — everything except `app`, `rendering` and `ui` — does n
 ```bash
 cargo run --profile test --example inspect -- 6
 ```
+
+## Interface language
+
+The UI is available in **English** and **Russian**. Switch it from the top bar during a simulation, from the main menu, or from Settings. On startup the language is detected from `LANG` (for example `LANG=ru_RU.UTF-8` selects Russian). The complete Russian README is [`README.ru.md`](README.ru.md).
 
 ## Controls
 

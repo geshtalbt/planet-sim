@@ -6,6 +6,7 @@ use bevy_egui::egui;
 use crate::app::{Screen, ViewState};
 use crate::experiments::compare_at;
 use crate::history::EventKind;
+use crate::localization::{pick, tr, translated};
 use crate::rendering::PlanetVisual;
 use crate::simulation::{Simulation, format_age};
 use crate::ui::{ChartMetric, UiState, accent, danger, muted, warning, widgets};
@@ -42,34 +43,35 @@ fn physics_window(
     }
     state.physics_was_open_last = open;
 
-    egui::Window::new("Planetary physics")
+    egui::Window::new(tr("Planetary physics"))
         .open(&mut open)
         .default_width(520.0)
         .resizable(true)
         .show(ctx, |ui| {
             let Some(sim) = simulation.as_deref_mut() else {
-                ui.label("No active simulation.");
+                ui.label(tr("No active simulation."));
                 return;
             };
             let initial = sim.initial_config.clone();
             egui::ScrollArea::vertical().max_height(680.0).show(ui, |ui| {
                 ui.label(
                     egui::RichText::new(
-                        "Changes feed the same energy-balance, hydrological and tectonic state used by the simulation. \
-                         Immediate controls apply at once; ramps are integrated over simulation time.",
+                        pick("Changes feed the same energy-balance, hydrological and tectonic state used by the simulation. Immediate controls apply at once; ramps are integrated over simulation time.",
+                             "Изменения влияют на тот же энергобаланс, гидрологию и тектонику, что и симуляция. Немедленные изменения применяются сразу; рампы интегрируются по времени симуляции."),
                     )
                     .size(10.0)
                     .color(muted()),
                 );
                 ui.separator();
 
-                ui.heading("Carbon dioxide");
+                ui.heading(tr("Carbon dioxide"));
                 let current_co2 = sim.active_planet().atmosphere.co2_ppm;
                 ui.horizontal(|ui| {
-                    ui.label(format!("Current {current_co2:.1} ppm"));
+                    ui.label(format!("{} {current_co2:.1} ppm", tr("Current")));
                     ui.label(
                         egui::RichText::new(format!(
-                            "initial {:.1} ppm · Δ {:+.1}",
+                            "{} {:.1} ppm · Δ {:+.1}",
+                            tr("initial"),
                             initial.co2_ppm,
                             current_co2 - initial.co2_ppm
                         ))
@@ -80,22 +82,22 @@ fn physics_window(
                 ui.add(
                     egui::Slider::new(&mut state.co2_edit, 10.0..=5_000_000.0)
                         .logarithmic(true)
-                        .text("Target atmospheric CO₂ (ppm)"),
+                        .text(tr("Target atmospheric CO₂ (ppm)")),
                 );
                 ui.checkbox(
                     &mut state.co2_redistribute,
-                    "Redistribute carbon between ocean / geological reservoirs",
+                    tr("Redistribute carbon between ocean / geological reservoirs"),
                 );
                 ui.horizontal(|ui| {
-                    if ui.button("Apply immediately").clicked() {
+                    if ui.button(tr("Apply immediately")).clicked() {
                         sim.active_planet_mut()
                             .set_co2_ppm(state.co2_edit, state.co2_redistribute);
                         state.status = Some((
-                            format!("Atmospheric CO₂ set to {:.1} ppm.", state.co2_edit),
+                            format!("{} {:.1} ppm.", pick("Atmospheric CO₂ set to", "Атмосферный CO₂ установлен на"), state.co2_edit),
                             false,
                         ));
                     }
-                    if ui.button("Set as gradual ramp target").clicked() {
+                    if ui.button(tr("Set as gradual ramp target")).clicked() {
                         let planet = sim.active_planet_mut();
                         planet.co2_ramp_target_ppm = state.co2_edit;
                         planet.co2_ramp_ppm_per_year =
@@ -106,13 +108,13 @@ fn physics_window(
                 {
                     let planet = sim.active_planet_mut();
                     ui.horizontal(|ui| {
-                        ui.label("Ramp rate (ppm/yr)");
+                        ui.label(tr("Ramp rate (ppm/yr)"));
                         ui.add(
                             egui::DragValue::new(&mut planet.co2_ramp_ppm_per_year)
                                 .speed(0.05)
                                 .range(0.0..=1.0e5),
                         );
-                        ui.label("target (ppm)");
+                        ui.label(tr("target (ppm)"));
                         ui.add(
                             egui::DragValue::new(&mut planet.co2_ramp_target_ppm)
                                 .speed(5.0)
@@ -121,8 +123,8 @@ fn physics_window(
                     });
                     ui.label(
                         egui::RichText::new(
-                            "Carbon exchange with the ocean and weathering continue during the ramp. \
-                             Immediate changes without redistribution change the total carbon inventory.",
+                            pick("Carbon exchange with the ocean and weathering continue during the ramp. Immediate changes without redistribution change the total carbon inventory.",
+                                 "Обмен углеродом с океаном и выветривание продолжаются во время рампы. Немедленные изменения без перераспределения меняют общий запас углерода."),
                         )
                         .size(9.5)
                         .color(muted()),
@@ -130,14 +132,14 @@ fn physics_window(
                 }
                 ui.separator();
 
-                ui.heading("Orbital and stellar controls");
+                ui.heading(tr("Orbital and stellar controls"));
                 {
                     let planet = sim.active_planet_mut();
                     let mut tilt = planet.config.axial_tilt_deg;
                     if ui
                         .add(
                             egui::Slider::new(&mut tilt, 0.0..=90.0)
-                                .text("Axial tilt (°)"),
+                                .text(tr("Axial tilt (°)")),
                         )
                         .changed()
                     {
@@ -147,7 +149,7 @@ fn physics_window(
                     if ui
                         .add(
                             egui::Slider::new(&mut solar, 0.3..=2.0)
-                                .text("Stellar flux multiplier"),
+                                .text(tr("Stellar flux multiplier")),
                         )
                         .changed()
                     {
@@ -155,8 +157,11 @@ fn physics_window(
                     }
                     ui.label(
                         egui::RichText::new(format!(
-                            "Tilt: current {:.2}° · initial {:.2}° · Δ {:+.2}°",
+                            "{}: {} {:.2}° · {} {:.2}° · Δ {:+.2}°",
+                            tr("Tilt"),
+                            tr("Current"),
                             planet.config.axial_tilt_deg,
+                            tr("initial"),
                             initial.axial_tilt_deg,
                             planet.config.axial_tilt_deg - initial.axial_tilt_deg
                         ))
@@ -165,21 +170,24 @@ fn physics_window(
                     );
                     ui.label(
                         egui::RichText::new(format!(
-                            "Stellar multiplier: current {:.3}× · initial 1.000× · Δ {:+.3}×",
+                            "{}: {} {:.3}× · {} 1.000× · Δ {:+.3}×",
+                            tr("Stellar multiplier"),
+                            tr("Current"),
                             planet.solar_multiplier,
+                            tr("initial"),
                             planet.solar_multiplier - 1.0
                         ))
                         .size(9.5)
                         .color(muted()),
                     );
                     ui.horizontal(|ui| {
-                        ui.label("Tilt ramp target (°)");
+                        ui.label(tr("Tilt ramp target (°)"));
                         ui.add(
                             egui::DragValue::new(&mut planet.tilt_ramp_target_deg)
                                 .speed(0.1)
                                 .range(0.0..=90.0),
                         );
-                        ui.label("rate (°/Myr)");
+                        ui.label(tr("rate (°/Myr)"));
                         ui.add(
                             egui::DragValue::new(&mut planet.tilt_ramp_deg_per_myr)
                                 .speed(0.05)
@@ -187,13 +195,13 @@ fn physics_window(
                         );
                     });
                     ui.horizontal(|ui| {
-                        ui.label("Stellar ramp target (×)");
+                        ui.label(tr("Stellar ramp target (×)"));
                         ui.add(
                             egui::DragValue::new(&mut planet.solar_ramp_target)
                                 .speed(0.005)
                                 .range(0.2..=3.0),
                         );
-                        ui.label("rate (×/yr)");
+                        ui.label(tr("rate (×/yr)"));
                         ui.add(
                             egui::DragValue::new(&mut planet.solar_ramp_per_year)
                                 .speed(1.0e-6)
@@ -203,9 +211,11 @@ fn physics_window(
                     });
                     ui.label(
                         egui::RichText::new(format!(
-                            "Current effective stellar multiplier {:.3}× (including event forcing). \
-                             Axial tilt changes insolation distribution and seasonal amplitude.",
-                            planet.effective_solar_multiplier()
+                            "{} {:.3}× ({}). {}",
+                            tr("Current effective stellar multiplier"),
+                            planet.effective_solar_multiplier(),
+                            pick("including event forcing", "включая форсинг событий"),
+                            pick("Axial tilt changes insolation distribution and seasonal amplitude.", "Наклон оси меняет распределение инсоляции и амплитуду сезонов.")
                         ))
                         .size(9.5)
                         .color(muted()),
@@ -213,7 +223,7 @@ fn physics_window(
                 }
                 ui.separator();
 
-                ui.heading("Atmosphere and surface");
+                ui.heading(tr("Atmosphere and surface"));
                 {
                     let planet = sim.active_planet_mut();
                     let mut pressure = planet.atmosphere.pressure_kpa;
@@ -221,7 +231,7 @@ fn physics_window(
                         .add(
                             egui::Slider::new(&mut pressure, 0.1..=500.0)
                                 .logarithmic(true)
-                                .text("Surface pressure (kPa)"),
+                                .text(tr("Surface pressure (kPa)")),
                         )
                         .changed()
                     {
@@ -231,7 +241,7 @@ fn physics_window(
                     if ui
                         .add(
                             egui::Slider::new(&mut cloud, 0.0..=1.0)
-                                .text("Cloud coverage"),
+                                .text(tr("Cloud coverage")),
                         )
                         .changed()
                     {
@@ -241,7 +251,7 @@ fn physics_window(
                     if ui
                         .add(
                             egui::Slider::new(&mut cloud_albedo, 0.3..=1.8)
-                                .text("Cloud albedo factor"),
+                                .text(tr("Cloud albedo factor")),
                         )
                         .changed()
                     {
@@ -251,7 +261,7 @@ fn physics_window(
                     if ui
                         .add(
                             egui::Slider::new(&mut albedo, -0.25..=0.35)
-                                .text("Surface albedo perturbation"),
+                                .text(tr("Surface albedo perturbation")),
                         )
                         .changed()
                     {
@@ -261,7 +271,7 @@ fn physics_window(
                     if ui
                         .add(
                             egui::Slider::new(&mut heat, 0.1..=4.0)
-                                .text("Ocean mixed-layer heat capacity"),
+                                .text(tr("Ocean mixed-layer heat capacity")),
                         )
                         .changed()
                     {
@@ -271,7 +281,7 @@ fn physics_window(
                     if ui
                         .add(
                             egui::Slider::new(&mut circulation, 0.0..=1.0)
-                                .text("Meridional ocean heat transport"),
+                                .text(tr("Meridional ocean heat transport")),
                         )
                         .changed()
                     {
@@ -279,39 +289,44 @@ fn physics_window(
                     }
                 }
                 ui.add_space(4.0);
-                ui.heading("Water inventory");
+                ui.heading(tr("Water inventory"));
                 let current_water = sim.active_planet().hydrology.total_water_km3;
                 ui.label(format!(
-                    "Current {:.3e} km³ · initial {:.3e} km³",
-                    current_water, initial.water.inventory_km3
+                    "{} {:.3e} {} · {} {:.3e} {}",
+                    tr("Current"),
+                    current_water,
+                    pick("km³", "км³"),
+                    tr("initial"),
+                    initial.water.inventory_km3,
+                    pick("km³", "км³")
                 ));
                 ui.add(
                     egui::Slider::new(&mut state.water_edit, 1.0e5..=3.0e9)
                         .logarithmic(true)
-                        .text("Total water inventory (km³)"),
+                        .text(tr("Total water inventory (km³)")),
                 );
-                if ui.button("Apply water inventory").clicked() {
+                if ui.button(tr("Apply water inventory")).clicked() {
                     sim.active_planet_mut()
                         .set_total_water_km3(state.water_edit);
                     state.status = Some(("Water inventory rebalanced; sea level re-solved.".into(), false));
                 }
                 ui.label(
                     egui::RichText::new(
-                        "Changing total water redistributes the ocean and changes sea level; land coverage is a consequence, not an independent slider.",
+                        tr("Changing total water redistributes the ocean and changes sea level; land coverage is a consequence, not an independent slider."),
                     )
                     .size(9.5)
                     .color(muted()),
                 );
                 ui.label(
                     egui::RichText::new(
-                        "Restart-only: radius, mass, seed, grid resolution, initial temperature/ocean temperature and initial ice coverage. These regenerate the planet rather than mutate it.",
+                        tr("Restart-only: radius, mass, seed, grid resolution, initial temperature/ocean temperature and initial ice coverage. These regenerate the planet rather than mutate it."),
                     )
                     .size(9.5)
                     .color(egui::Color32::from_rgb(180, 145, 100)),
                 );
                 ui.separator();
 
-                ui.heading("Rotation and gravity");
+                ui.heading(tr("Rotation and gravity"));
                 {
                     let planet = sim.active_planet_mut();
                     let mut rotation = planet.config.rotation_period_hours;
@@ -319,7 +334,7 @@ fn physics_window(
                         .add(
                             egui::Slider::new(&mut rotation, 2.0..=200.0)
                                 .logarithmic(true)
-                                .text("Rotation period (hours)"),
+                                .text(tr("Rotation period (hours)")),
                         )
                         .changed()
                     {
@@ -329,7 +344,7 @@ fn physics_window(
                     if ui
                         .add(
                             egui::Slider::new(&mut gravity, 0.5..=30.0)
-                                .text("Surface gravity (m/s²)"),
+                                .text(tr("Surface gravity (m/s²)")),
                         )
                         .changed()
                     {
@@ -337,17 +352,17 @@ fn physics_window(
                     }
                     ui.label(
                         egui::RichText::new(
-                            "Rotation changes the model's heat-transport/weather scaling; gravity changes the atmospheric scale height and local pressure. Neither is a full circulation solver.",
+                            tr("Rotation changes the model's heat-transport/weather scaling; gravity changes the atmospheric scale height and local pressure. Neither is a full circulation solver."),
                         )
                         .size(9.5)
                         .color(muted()),
                     );
                 }
                 ui.separator();
-                ui.heading("Parameter history");
+                ui.heading(tr("Parameter history"));
                 {
                     let history = sim.active_history();
-                    ui.label(egui::RichText::new("Global temperature").size(10.0));
+                    ui.label(egui::RichText::new(tr("Global temperature")).size(10.0));
                     widgets::draw_history_chart(
                         ui,
                         history,
@@ -355,7 +370,7 @@ fn physics_window(
                         1.0,
                         82.0,
                     );
-                    ui.label(egui::RichText::new("Atmospheric CO₂").size(10.0));
+                    ui.label(egui::RichText::new(tr("Atmospheric CO₂")).size(10.0));
                     widgets::draw_history_chart(ui, history, ChartMetric::Co2, 1.0, 82.0);
                 }
             });
@@ -373,12 +388,12 @@ fn statistics_window(
     mut simulation: Option<&mut Simulation>,
 ) {
     let mut open = state.show_statistics;
-    egui::Window::new("Planet statistics")
+    egui::Window::new(tr("Planet statistics"))
         .open(&mut open)
         .default_width(560.0)
         .show(ctx, |ui| {
             let Some(sim) = simulation.as_deref_mut() else {
-                ui.label("No active simulation.");
+                ui.label(tr("No active simulation."));
                 return;
             };
             let stats = sim.active_planet().stats.clone();
@@ -393,8 +408,10 @@ fn statistics_window(
                 );
                 ui.label(
                     egui::RichText::new(format!(
-                        "{} · {history_len} history samples",
-                        biome.name()
+                        "{} · {} {}",
+                        biome.name(),
+                        history_len,
+                        pick("history samples", "сэмплов истории")
                     ))
                     .size(10.5)
                     .color(muted()),
@@ -432,7 +449,7 @@ fn statistics_window(
                         stat_pair(ui, "Plates", format!("{}", stats.plate_count));
                         stat_pair(ui, "Active eruptions", format!("{}", stats.active_eruptions));
                         stat_pair(ui, "Magnetic field", format!("{:.0}%", stats.magnetic_field * 100.0));
-                        stat_pair(ui, "Land elevation", format!("mean {:.0} m · range {:.0}…{:.0} m", stats.mean_land_elevation_m, stats.min_elevation_m, stats.max_elevation_m));
+                        stat_pair(ui, "Land elevation", format!("{} {:.0} m · {} {:.0}…{:.0} m", pick("mean", "средняя"), stats.mean_land_elevation_m, pick("range", "диапазон"), stats.min_elevation_m, stats.max_elevation_m));
                     });
                 ui.separator();
                 ui.horizontal(|ui| {
@@ -443,7 +460,7 @@ fn statistics_window(
                                 ui.selectable_value(&mut state.chart_metric, metric, metric.label());
                             }
                         });
-                    ui.label("time window");
+                    ui.label(tr("time window"));
                     ui.add(
                         egui::Slider::new(&mut state.chart_fraction, 0.02..=1.0)
                             .show_value(false),
@@ -458,7 +475,7 @@ fn statistics_window(
                 );
                 ui.label(
                     egui::RichText::new(
-                        "All values are computed from the current cell grid and global reservoirs. No statistics are generated for display alone.",
+                        tr("All values are computed from the current cell grid and global reservoirs. No statistics are generated for display alone."),
                     )
                     .size(10.0)
                     .color(muted()),
@@ -475,12 +492,12 @@ fn catastrophe_window(
     mut simulation: Option<&mut Simulation>,
 ) {
     let mut open = state.show_catastrophes;
-    egui::Window::new("Catastrophe management")
+    egui::Window::new(tr("Catastrophe management"))
         .open(&mut open)
         .default_width(540.0)
         .show(ctx, |ui| {
             let Some(sim) = simulation.as_deref_mut() else {
-                ui.label("No active simulation.");
+                ui.label(tr("No active simulation."));
                 return;
             };
             let n = sim.active_planet().grid.cell_count();
@@ -496,25 +513,25 @@ fn catastrophe_window(
                 sim.active_planet().grid.lon_deg(target),
             );
             ui.horizontal(|ui| {
-                ui.checkbox(&mut state.event_at_selected, "Use selected region");
-                ui.label(format!("Target cell {target} · {lat:.1}°, {lon:.1}°"));
-                if ui.button("Pick another").clicked() {
+                ui.checkbox(&mut state.event_at_selected, tr("Use selected region"));
+                ui.label(format!("{} {target} · {lat:.1}°, {lon:.1}°", tr("Target cell")));
+                if ui.button(tr("Pick another")).clicked() {
                     view.selected_cell = Some(target);
                 }
             });
             let mut log: Vec<(EventKind, String, String)> = Vec::new();
             egui::ScrollArea::vertical().max_height(650.0).show(ui, |ui| {
-                ui.heading("Volcanic activity");
+                ui.heading(tr("Volcanic activity"));
                 ui.add(
                     egui::Slider::new(&mut state.volcano_intensity, 0.5..=10.0)
-                        .text("Intensity"),
+                        .text(tr("Intensity")),
                 );
                 ui.add(
                     egui::Slider::new(&mut state.volcano_duration, 1.0..=10_000.0)
                         .logarithmic(true)
-                        .text("Duration (years)"),
+                        .text(tr("Duration (years)")),
                 );
-                if ui.button("Trigger eruption").clicked() {
+                if ui.button(tr("Trigger eruption")).clicked() {
                     let outcome = sim.active_planet_mut().trigger_volcano(
                         target,
                         state.volcano_intensity,
@@ -528,26 +545,26 @@ fn catastrophe_window(
                 }
                 ui.label(
                     egui::RichText::new(
-                        "Eruptions inject aerosols (short cooling) and CO₂ from the geological reservoir (longer warming), and add lava relief.",
+                        tr("Eruptions inject aerosols (short cooling) and CO₂ from the geological reservoir (longer warming), and add lava relief."),
                     )
                     .size(9.5)
                     .color(muted()),
                 );
                 ui.separator();
 
-                ui.heading("Asteroid impact");
+                ui.heading(tr("Asteroid impact"));
                 ui.add(
                     egui::Slider::new(&mut state.asteroid_diameter, 0.05..=50.0)
                         .logarithmic(true)
-                        .text("Impactor diameter (km)"),
+                        .text(tr("Impactor diameter (km)")),
                 );
                 ui.add(
                     egui::Slider::new(&mut state.asteroid_velocity, 5.0..=70.0)
-                        .text("Impact velocity (km/s)"),
+                        .text(tr("Impact velocity (km/s)")),
                 );
                 ui.add(
                     egui::Slider::new(&mut state.asteroid_angle, 5.0..=90.0)
-                        .text("Impact angle (°)"),
+                        .text(tr("Impact angle (°)")),
                 );
                 let energy = crate::catastrophes::impact_energy(
                     state.asteroid_diameter,
@@ -555,10 +572,12 @@ fn catastrophe_window(
                     state.asteroid_angle,
                 );
                 ui.label(format!(
-                    "Kinetic energy ≈ {:.2e} J · crater-scale deformation and dust opacity are computed from energy",
-                    energy
+                    "{} ≈ {:.2e} J · {}",
+                    tr("Kinetic energy"),
+                    energy,
+                    pick("crater-scale deformation and dust opacity are computed from energy", "деформация кратера и оптическая толщина пыли вычисляются из энергии")
                 ));
-                if ui.button("Impact selected region").clicked() {
+                if ui.button(tr("Impact selected region")).clicked() {
                     let (outcome, _) = sim.active_planet_mut().trigger_asteroid(
                         target,
                         state.asteroid_diameter,
@@ -573,7 +592,7 @@ fn catastrophe_window(
                 }
                 ui.separator();
 
-                ui.heading("Regional weather");
+                ui.heading(tr("Regional weather"));
                 egui::ComboBox::from_id_salt("weather_kind")
                     .selected_text(state.weather_kind.label())
                     .show_ui(ui, |ui| {
@@ -583,14 +602,14 @@ fn catastrophe_window(
                     });
                 ui.add(
                     egui::Slider::new(&mut state.weather_intensity, 0.05..=1.0)
-                        .text("Intensity"),
+                        .text(tr("Intensity")),
                 );
                 ui.add(
                     egui::Slider::new(&mut state.weather_days, 0.5..=180.0)
                         .logarithmic(true)
-                        .text("Duration (days)"),
+                        .text(tr("Duration (days)")),
                 );
-                if ui.button("Trigger weather event").clicked() {
+                if ui.button(tr("Trigger weather event")).clicked() {
                     let outcome = sim.active_planet_mut().trigger_weather(
                         state.weather_kind,
                         target,
@@ -601,9 +620,9 @@ fn catastrophe_window(
                 }
                 ui.separator();
 
-                ui.heading("Planet-scale events");
+                ui.heading(tr("Planet-scale events"));
                 ui.horizontal_wrapped(|ui| {
-                    if ui.button("Glaciation forcing").clicked() {
+                    if ui.button(tr("Glaciation forcing")).clicked() {
                         let outcome = sim.active_planet_mut()
                             .trigger_ice_age(state.ice_age_duration);
                         log.push((
@@ -612,7 +631,7 @@ fn catastrophe_window(
                             outcome.description,
                         ));
                     }
-                    if ui.button("Inject CO₂").clicked() {
+                    if ui.button(tr("Inject CO₂")).clicked() {
                         let outcome = sim.active_planet_mut().trigger_warming(state.warming_ppm);
                         log.push((
                             EventKind::Catastrophe(outcome.kind),
@@ -620,7 +639,7 @@ fn catastrophe_window(
                             outcome.description,
                         ));
                     }
-                    if ui.button("Aerosol cooling").clicked() {
+                    if ui.button(tr("Aerosol cooling")).clicked() {
                         let outcome = sim.active_planet_mut().trigger_rapid_cooling(state.cooling_tau);
                         log.push((
                             EventKind::Catastrophe(outcome.kind),
@@ -628,7 +647,7 @@ fn catastrophe_window(
                             outcome.description,
                         ));
                     }
-                    if ui.button("Ocean circulation slowdown").clicked() {
+                    if ui.button(tr("Ocean circulation slowdown")).clicked() {
                         let outcome = sim
                             .active_planet_mut()
                             .trigger_ocean_circulation(50_000.0);
@@ -638,7 +657,7 @@ fn catastrophe_window(
                             outcome.description,
                         ));
                     }
-                    if ui.button("Magnetic reversal").clicked() {
+                    if ui.button(tr("Magnetic reversal")).clicked() {
                         let outcome = sim.active_planet_mut().trigger_magnetic_reversal();
                         log.push((
                             EventKind::Catastrophe(outcome.kind),
@@ -650,61 +669,71 @@ fn catastrophe_window(
                 ui.add(
                     egui::Slider::new(&mut state.ice_age_duration, 1_000.0..=2_000_000.0)
                         .logarithmic(true)
-                        .text("Glaciation forcing duration (yr)"),
+                        .text(tr("Glaciation forcing duration (yr)")),
                 );
                 ui.add(
                     egui::Slider::new(&mut state.warming_ppm, 10.0..=20_000.0)
                         .logarithmic(true)
-                        .text("CO₂ injection (ppm)"),
+                        .text(tr("CO₂ injection (ppm)")),
                 );
                 ui.add(
                     egui::Slider::new(&mut state.cooling_tau, 0.05..=5.0)
-                        .text("Aerosol optical depth"),
+                        .text(tr("Aerosol optical depth")),
                 );
                 ui.separator();
 
-                ui.heading("Random event settings");
+                ui.heading(tr("Random event settings"));
                 let settings = &mut sim.active_planet_mut().catastrophes.settings;
-                ui.checkbox(&mut settings.random_events, "Random catastrophes enabled");
+                ui.checkbox(&mut settings.random_events, tr("Random catastrophes enabled"));
                 ui.add(
                     egui::Slider::new(&mut settings.eruption_rate_per_myr, 0.0..=5.0)
-                        .text("Large eruptions / Myr"),
+                        .text(tr("Large eruptions / Myr")),
                 );
                 ui.add(
                     egui::Slider::new(&mut settings.impact_rate_per_myr, 0.0..=1.0)
-                        .text("Impacts / Myr"),
+                        .text(tr("Impacts / Myr")),
                 );
                 ui.add(
                     egui::Slider::new(&mut settings.ice_age_rate_per_myr, 0.0..=0.2)
-                        .text("Glaciation forcings / Myr"),
+                        .text(tr("Glaciation forcings / Myr")),
                 );
                 ui.separator();
 
                 let planet = sim.active_planet();
-                ui.heading("Active events");
+                ui.heading(tr("Active events"));
                 if planet.catastrophes.volcanoes.is_empty()
                     && planet.catastrophes.forcings.is_empty()
                     && planet.weather.events.is_empty()
                 {
-                    ui.label(egui::RichText::new("No active events.").size(10.5).color(muted()));
+                    ui.label(egui::RichText::new(tr("No active events.")).size(10.5).color(muted()));
                 }
                 for v in &planet.catastrophes.volcanoes {
                     ui.label(format!(
-                        "Volcanic eruption · intensity {:.1} · {:.0} yr remaining · cell {}",
-                        v.intensity, v.remaining_years, v.cell
+                        "{} · {} {:.1} · {:.0} {} · {} {}",
+                        tr("Volcanic eruption"),
+                        tr("intensity"),
+                        v.intensity,
+                        v.remaining_years,
+                        pick("yr remaining", "лет осталось"),
+                        tr("cell"),
+                        v.cell
                     ));
                 }
                 for f in &planet.catastrophes.forcings {
                     ui.label(format!(
-                        "{} · {:.0} yr remaining",
-                        f.label, f.remaining_years
+                        "{} · {:.0} {}",
+                        translated(&f.label),
+                        f.remaining_years,
+                        pick("yr remaining", "лет осталось")
                     ));
                 }
                 for w in planet.weather.events.iter().take(12) {
                     ui.label(format!(
-                        "{} · {:.1} days remaining · cell {}",
+                        "{} · {:.1} {} · {} {}",
                         w.kind.label(),
                         w.remaining_years * 365.25,
+                        pick("days remaining", "дней осталось"),
+                        tr("cell"),
                         w.cell
                     ));
                 }
@@ -723,25 +752,27 @@ fn history_window(
     mut simulation: Option<&mut Simulation>,
 ) {
     let mut open = state.show_history;
-    egui::Window::new("Planet history and checkpoints")
+    egui::Window::new(tr("Planet history and checkpoints"))
         .open(&mut open)
         .default_width(600.0)
         .show(ctx, |ui| {
             let Some(sim) = simulation.as_deref_mut() else {
-                ui.label("No active simulation.");
+                ui.label(tr("No active simulation."));
                 return;
             };
             ui.label(
                 egui::RichText::new(format!(
-                    "Simulation age {}. Checkpoints store complete states; the timeline resolution is the checkpoint interval, not individual steps.",
-                    format_age(sim.main.planet.time_years)
+                    "{} {}. {}",
+                    pick("Simulation age", "Возраст симуляции"),
+                    format_age(sim.main.planet.time_years),
+                    pick("Checkpoints store complete states; the timeline resolution is the checkpoint interval, not individual steps.", "Контрольные точки хранят полные состояния; разрешение таймлайна — интервал между контрольными точками, а не отдельные шаги.")
                 ))
                 .size(10.0)
                 .color(muted()),
             );
             ui.separator();
             let mut jump = None;
-            ui.heading("Checkpoints");
+            ui.heading(tr("Checkpoints"));
             egui::ScrollArea::vertical().id_salt("checkpoints").max_height(170.0).show(ui, |ui| {
                 for (index, cp) in sim.checkpoints.iter().enumerate() {
                     ui.horizontal(|ui| {
@@ -749,12 +780,12 @@ fn history_window(
                             egui::RichText::new(format!(
                                 "{} · {}",
                                 format_age(cp.time_years),
-                                cp.label
+                                translated(&cp.label)
                             ))
                             .size(10.5)
                             .monospace(),
                         );
-                        if ui.small_button("Restore").clicked() {
+                        if ui.small_button(tr("Restore")).clicked() {
                             jump = Some(index);
                         }
                     });
@@ -772,16 +803,16 @@ fn history_window(
                     Err(err) => state.status = Some((err, true)),
                 }
             }
-            if ui.button("Store checkpoint at current time").clicked() {
+            if ui.button(tr("Store checkpoint at current time")).clicked() {
                 let label = format_age(sim.main.planet.time_years);
                 sim.push_checkpoint(label);
             }
             ui.separator();
-            ui.heading("Event log");
+            ui.heading(tr("Event log"));
             egui::ScrollArea::vertical().id_salt("events").max_height(230.0).show(ui, |ui| {
                 let events: Vec<_> = sim.active_history().events.iter().rev().take(160).cloned().collect();
                 if events.is_empty() {
-                    ui.label(egui::RichText::new("No events recorded.").size(10.5).color(muted()));
+                    ui.label(egui::RichText::new(tr("No events recorded.")).size(10.5).color(muted()));
                 }
                 for event in events {
                     let color = match event.kind {
@@ -795,7 +826,7 @@ fn history_window(
                         egui::RichText::new(format!(
                             "{} · {}",
                             format_age(event.time_years),
-                            event.title
+                            translated(&event.title)
                         ))
                         .size(10.5)
                         .color(color),
@@ -812,11 +843,11 @@ fn history_window(
             let history = sim.active_history();
             widgets::draw_history_chart(ui, history, ChartMetric::Temperature, 1.0, 150.0);
             ui.horizontal(|ui| {
-                if ui.button("Restart from initial configuration").clicked() {
+                if ui.button(tr("Restart from initial configuration")).clicked() {
                     state.confirm_restart = true;
                     state.show_settings = true;
                 }
-                if ui.button("Open What If? comparison").clicked() {
+                if ui.button(tr("Open What If? comparison")).clicked() {
                     state.show_experiments = true;
                 }
             });
@@ -831,15 +862,15 @@ fn saves_window(
     simulation: Option<&mut Simulation>,
 ) {
     let mut open = state.show_saves;
-    egui::Window::new("Saved planets")
+    egui::Window::new(tr("Saved planets"))
         .open(&mut open)
         .default_width(620.0)
         .show(ctx, |ui| {
             ui.horizontal(|ui| {
-                if ui.button("Refresh").clicked() {
+                if ui.button(tr("Refresh")).clicked() {
                     crate::ui::refresh_saves(state);
                 }
-                if ui.button("Save current planet").clicked() {
+                if ui.button(tr("Save current planet")).clicked() {
                     if let Some(sim) = simulation.as_ref() {
                         match state.save_manager.save(sim) {
                             Ok(path) => {
@@ -853,9 +884,9 @@ fn saves_window(
                 }
             });
             ui.horizontal(|ui| {
-                ui.label("Save as");
+                ui.label(tr("Save as"));
                 ui.text_edit_singleline(&mut state.save_name);
-                if ui.button("Save copy").clicked() {
+                if ui.button(tr("Save copy")).clicked() {
                     if let Some(sim) = simulation.as_ref() {
                         let name = if state.save_name.trim().is_empty() {
                             sim.main.planet.config.name.clone()
@@ -889,7 +920,7 @@ fn saves_window(
                     let saves = state.saves.clone();
                     if saves.is_empty() {
                         ui.label(
-                            egui::RichText::new("No saved planets in this folder.")
+                            egui::RichText::new(tr("No saved planets in this folder."))
                                 .size(10.5)
                                 .color(muted()),
                         );
@@ -910,18 +941,18 @@ fn saves_window(
                                 .size(9.5)
                                 .color(muted()),
                             );
-                            if ui.small_button("Load").clicked() {
+                            if ui.small_button(tr("Load")).clicked() {
                                 state.pending_load = Some(meta.name.clone());
                                 state.status = Some(("Loading…".into(), false));
                             }
-                            if ui.small_button("Duplicate").clicked() {
+                            if ui.small_button(tr("Duplicate")).clicked() {
                                 let copy_name = format!("{} copy", meta.name);
                                 match state.save_manager.duplicate(&meta.name, &copy_name) {
                                     Ok(_) => crate::ui::refresh_saves(state),
                                     Err(err) => state.status = Some((format!("{err}"), true)),
                                 }
                             }
-                            if ui.small_button("Rename").clicked() {
+                            if ui.small_button(tr("Rename")).clicked() {
                                 let new_name = if state.save_name.trim().is_empty() {
                                     format!("{} renamed", meta.name)
                                 } else {
@@ -932,7 +963,7 @@ fn saves_window(
                                     Err(err) => state.status = Some((format!("{err}"), true)),
                                 }
                             }
-                            if ui.small_button("Delete").clicked() {
+                            if ui.small_button(tr("Delete")).clicked() {
                                 if state.confirm_delete.as_deref() == Some(meta.name.as_str()) {
                                     match state.save_manager.delete(&meta.name) {
                                         Ok(()) => {
@@ -947,7 +978,7 @@ fn saves_window(
                             }
                             if state.confirm_delete.as_deref() == Some(meta.name.as_str()) {
                                 ui.label(
-                                    egui::RichText::new("click Delete again to confirm")
+                                    egui::RichText::new(tr("click Delete again to confirm"))
                                         .size(9.0)
                                         .color(danger()),
                                 );
@@ -967,17 +998,17 @@ fn experiments_window(
     mut simulation: Option<&mut Simulation>,
 ) {
     let mut open = state.show_experiments;
-    egui::Window::new("What If? — planet comparison")
+    egui::Window::new(tr("What If? — planet comparison"))
         .open(&mut open)
         .default_width(680.0)
         .show(ctx, |ui| {
             let Some(sim) = simulation.as_deref_mut() else {
-                ui.label("No active simulation.");
+                ui.label(tr("No active simulation."));
                 return;
             };
             ui.label(
                 egui::RichText::new(
-                    "Each branch is a complete planet state, not a separate visual preset. Forks advance on the same clock and comparisons use the recorded history.",
+                    tr("Each branch is a complete planet state, not a separate visual preset. Forks advance on the same clock and comparisons use the recorded history."),
                 )
                 .size(10.0)
                 .color(muted()),
@@ -1002,9 +1033,9 @@ fn experiments_window(
             sim.set_active(selected);
             ui.horizontal(|ui| {
                 ui.text_edit_singleline(&mut state.fork_name);
-                if ui.button("Create fork from active").clicked() {
+                if ui.button(tr("Create fork from active")).clicked() {
                     let label = if state.fork_name.trim().is_empty() {
-                        format!("Experiment {}", sim.forks.len() + 1)
+                        format!("{} {}", pick("Experiment", "Эксперимент"), sim.forks.len() + 1)
                     } else {
                         state.fork_name.clone()
                     };
@@ -1015,18 +1046,18 @@ fn experiments_window(
                 if sim.active > 0 {
                     let index = sim.active;
                     let label = sim.active_run().label.clone();
-                    if ui.button("Delete active fork").clicked() {
+                    if ui.button(tr("Delete active fork")).clicked() {
                         sim.delete_fork(index);
-                        state.status = Some((format!("Deleted fork '{label}'."), false));
+                        state.status = Some((format!("{} '{label}'.", pick("Deleted fork", "Удалена ветвь")), false));
                     }
                 }
             });
             ui.separator();
-            ui.heading("Quick experiments");
+            ui.heading(tr("Quick experiments"));
             ui.horizontal_wrapped(|ui| {
-                if ui.button("Double CO₂").clicked() {
+                if ui.button(tr("Double CO₂")).clicked() {
                     let target = sim.active_planet().atmosphere.co2_ppm * 2.0;
-                    let index = sim.create_fork("CO₂ ×2".to_string());
+                    let index = sim.create_fork(pick("CO₂ ×2", "CO₂ ×2").to_string());
                     sim.set_active(index);
                     sim.active_planet_mut().set_co2_ppm(target, true);
                     sim.log_active_event(
@@ -1035,8 +1066,8 @@ fn experiments_window(
                         format!("Forked with atmospheric CO₂ set to {target:.0} ppm."),
                     );
                 }
-                if ui.button("Stellar flux −20%").clicked() {
-                    let index = sim.create_fork("Dim star".to_string());
+                if ui.button(tr("Stellar flux −20%")).clicked() {
+                    let index = sim.create_fork(pick("Dim star", "Тусклая звезда").to_string());
                     sim.set_active(index);
                     let target = sim.active_planet().solar_multiplier * 0.8;
                     sim.active_planet_mut().set_solar_multiplier(target);
@@ -1046,8 +1077,8 @@ fn experiments_window(
                         "Stellar flux reduced by 20% in a forked planet.",
                     );
                 }
-                if ui.button("Tilt +15°").clicked() {
-                    let index = sim.create_fork("High tilt".to_string());
+                if ui.button(tr("Tilt +15°")).clicked() {
+                    let index = sim.create_fork(pick("High tilt", "Большой наклон").to_string());
                     sim.set_active(index);
                     let target = (sim.active_planet().config.axial_tilt_deg + 15.0).min(90.0);
                     sim.active_planet_mut().set_axial_tilt_deg(target);
@@ -1057,8 +1088,8 @@ fn experiments_window(
                         format!("Axial tilt raised to {target:.1}°."),
                     );
                 }
-                if ui.button("Albedo +0.1").clicked() {
-                    let index = sim.create_fork("Bright surface".to_string());
+                if ui.button(tr("Albedo +0.1")).clicked() {
+                    let index = sim.create_fork(pick("Bright surface", "Светлая поверхность").to_string());
                     sim.set_active(index);
                     sim.active_planet_mut().set_surface_albedo_offset(0.1);
                     sim.log_active_event(
@@ -1067,8 +1098,8 @@ fn experiments_window(
                         "Surface albedo perturbation +0.1 applied.",
                     );
                 }
-                if ui.button("Asteroid impact").clicked() {
-                    let index = sim.create_fork("Impact experiment".to_string());
+                if ui.button(tr("Asteroid impact")).clicked() {
+                    let index = sim.create_fork(pick("Impact experiment", "Эксперимент с ударом").to_string());
                     sim.set_active(index);
                     let n = sim.active_planet().grid.cell_count();
                     let cell = (sim.active_planet().time_years as usize * 7919) % n.max(1);
@@ -1081,8 +1112,8 @@ fn experiments_window(
                         outcome.description,
                     );
                 }
-                if ui.button("Force glaciation").clicked() {
-                    let index = sim.create_fork("Glaciation experiment".to_string());
+                if ui.button(tr("Force glaciation")).clicked() {
+                    let index = sim.create_fork(pick("Glaciation experiment", "Эксперимент с оледенением").to_string());
                     sim.set_active(index);
                     let outcome = sim.active_planet_mut().trigger_ice_age(250_000.0);
                     sim.log_active_event(
@@ -1093,14 +1124,14 @@ fn experiments_window(
                 }
             });
             ui.separator();
-            ui.heading("Synchronised comparison");
+            ui.heading(tr("Synchronised comparison"));
             ui.add(
                 egui::Slider::new(&mut state.compare_fraction, 0.02..=1.0)
-                    .text("Timeline window"),
+                    .text(tr("Timeline window")),
             );
             if sim.forks.is_empty() {
                 ui.label(
-                    egui::RichText::new("Create a fork to compare planetary histories.")
+                    egui::RichText::new(tr("Create a fork to compare planetary histories."))
                         .size(10.5)
                         .color(muted()),
                 );
@@ -1123,12 +1154,12 @@ fn experiments_window(
                     .num_columns(6)
                     .spacing([12.0, 5.0])
                     .show(ui, |ui| {
-                        ui.strong("Planet");
-                        ui.strong("ΔT °C");
-                        ui.strong("ΔCO₂");
-                        ui.strong("Δ sea level");
-                        ui.strong("Δ ice");
-                        ui.strong("Δ land");
+                        ui.strong(tr("Planet"));
+                        ui.strong(tr("ΔT °C"));
+                        ui.strong(tr("ΔCO₂"));
+                        ui.strong(tr("Δ sea level"));
+                        ui.strong(tr("Δ ice"));
+                        ui.strong(tr("Δ land"));
                         ui.end_row();
                         for fork in &sim.forks {
                             let cmp = compare_at(&sim.main, fork, at);
@@ -1174,7 +1205,11 @@ fn experiments_window(
                     210.0,
                 );
                 ui.label(
-                    egui::RichText::new(format!("Comparison time: {}", format_age(at)))
+                    egui::RichText::new(format!(
+                        "{}: {}",
+                        pick("Comparison time", "Время сравнения"),
+                        format_age(at)
+                    ))
                         .size(10.0)
                         .color(muted()),
                 );
@@ -1191,59 +1226,85 @@ fn settings_window(
     visual: &mut PlanetVisual,
 ) {
     let mut open = state.show_settings;
-    egui::Window::new("Application settings")
+    egui::Window::new(tr("Application settings"))
         .open(&mut open)
         .default_width(430.0)
         .show(ctx, |ui| {
-            ui.heading("Visualisation");
-            ui.checkbox(&mut view.show_rivers, "Show rivers");
-            ui.checkbox(&mut view.show_clouds, "Show cloud veil");
-            ui.checkbox(&mut view.show_atmosphere, "Show atmosphere shell");
+            ui.heading(tr("Language / Язык"));
+            ui.horizontal(|ui| {
+                ui.selectable_value(
+                    &mut state.language,
+                    crate::localization::Language::English,
+                    "English",
+                );
+                ui.selectable_value(
+                    &mut state.language,
+                    crate::localization::Language::Russian,
+                    "Русский",
+                );
+                crate::localization::set_language(state.language);
+            });
+            ui.separator();
+            ui.heading(tr("Visualisation"));
+            ui.checkbox(&mut view.show_rivers, tr("Show rivers"));
+            ui.checkbox(&mut view.show_clouds, tr("Show cloud veil"));
+            ui.checkbox(&mut view.show_atmosphere, tr("Show atmosphere shell"));
             ui.add(
                 egui::Slider::new(&mut view.elevation_exaggeration, 0.0..=80.0)
-                    .text("Elevation exaggeration"),
+                    .text(tr("Elevation exaggeration")),
             );
             ui.label(
                 egui::RichText::new(
-                    "The mesh is displaced for readability. Ocean surfaces are drawn at sea level; stored elevations are unchanged.",
+                    tr("The mesh is displaced for readability. Ocean surfaces are drawn at sea level; stored elevations are unchanged."),
                 )
                 .size(9.5)
                 .color(muted()),
             );
             ui.separator();
-            ui.heading("Storage");
+            ui.heading(tr("Storage"));
             ui.label(
                 egui::RichText::new(state.save_manager.dir.display().to_string())
                     .size(10.0)
                     .monospace(),
             );
             ui.label(
-                egui::RichText::new("Saves are JSON + gzip with a versioned header. Topology is rebuilt from the subdivision level on load.")
+                egui::RichText::new(tr("Saves are JSON + gzip with a versioned header. Topology is rebuilt from the subdivision level on load."))
                     .size(9.5)
                     .color(muted()),
             );
             ui.separator();
-            ui.heading("Simulation");
+            ui.heading(tr("Simulation"));
             if let Some(sim) = simulation.as_ref() {
-                ui.label(format!("Active planet: {}", sim.active_planet().config.name));
-                ui.label(format!("Speed: {:.3} yr/s", sim.time.speed_years_per_second));
                 ui.label(format!(
-                    "Checkpoint resolution: stored every ~8% of elapsed time (max 10 states)."
+                    "{}: {}",
+                    pick("Active planet", "Активная планета"),
+                    sim.active_planet().config.name
+                ));
+                ui.label(format!(
+                    "{}: {:.3} {}/{}",
+                    pick("Speed", "Скорость"),
+                    sim.time.speed_years_per_second,
+                    pick("yr", "лет"),
+                    pick("s", "с")
+                ));
+                ui.label(pick(
+                    "Checkpoint resolution: stored every ~8% of elapsed time (max 10 states).",
+                    "Разрешение контрольных точек: примерно каждые 8% прошедшего времени (не более 10 состояний)."
                 ));
             }
-            if ui.button("Restart simulation from its initial configuration").clicked() {
+            if ui.button(tr("Restart simulation from its initial configuration")).clicked() {
                 state.confirm_restart = true;
             }
             if state.confirm_restart {
                 ui.label(
                     egui::RichText::new(
-                        "This regenerates the planet from the initial configuration and discards forks/history. Confirm?",
+                        tr("This regenerates the planet from the initial configuration and discards forks/history. Confirm?"),
                     )
                     .size(10.0)
                     .color(warning()),
                 );
                 ui.horizontal(|ui| {
-                    if ui.button("Confirm restart").clicked() {
+                    if ui.button(tr("Confirm restart")).clicked() {
                         if let Some(sim) = simulation.as_deref_mut() {
                             match sim.restart() {
                                 Ok(()) => {
@@ -1257,7 +1318,7 @@ fn settings_window(
                             }
                         }
                     }
-                    if ui.button("Cancel").clicked() {
+                    if ui.button(tr("Cancel")).clicked() {
                         state.confirm_restart = false;
                     }
                 });
@@ -1265,8 +1326,9 @@ fn settings_window(
             ui.separator();
             ui.label(
                 egui::RichText::new(format!(
-                    "Planet Simulator {} · Rust + Bevy · model limitations in docs/MODEL.md",
-                    env!("CARGO_PKG_VERSION")
+                    "Planet Simulator {} · Rust + Bevy · {}",
+                    env!("CARGO_PKG_VERSION"),
+                    pick("model limitations in docs/MODEL.md", "ограничения модели — в docs/MODEL.md")
                 ))
                 .size(9.5)
                 .color(muted()),
@@ -1277,13 +1339,23 @@ fn settings_window(
 
 fn help_window(ctx: &egui::Context, state: &mut UiState) {
     let mut open = state.show_help;
-    egui::Window::new("How the model works")
+    let ru = state.language == crate::localization::Language::Russian;
+    egui::Window::new(tr("How the model works"))
         .open(&mut open)
         .default_width(560.0)
         .show(ctx, |ui| {
             egui::ScrollArea::vertical().max_height(620.0).show(ui, |ui| {
-                ui.heading("Implemented");
-                ui.label(
+                ui.heading(tr("Implemented"));
+                ui.label(if ru {
+                    "• Икосферическая поверхность с послойным состоянием: рельеф, вода, лёд, почва, климат и реки\n\
+                     • Детерминированный фрактальный рельеф, маски континентов, рельеф границ плит и калиброванный уровень моря\n\
+                     • Однослойный радиационный энергобаланс с логарифмическим CO₂-форсингом, обратной связью водяного пара, облаками, ледовым альбедо и аэрозолями\n\
+                     • Широтное и сезонное распределение температуры с теплоёмкостью суши/океана и горизонтальным переносом тепла\n\
+                     • Испарение → осадки → почва → сток → маршрутизация рек → океан; снег, рост/таяние ледников и масс-сохраняющий уровень моря\n\
+                     • Кинематическое движение плит, поднятия/желоба, эрозия, вулканизм, сейсмика\n\
+                     • Удары астероидов с масштабируемыми кратерами и пылью; вулканические газы/аэрозоли; оледенение\n\
+                     • Погодные события с локальными эффектами, журнал событий, адаптивная история, контрольные точки, ветви и версионированные сохранения"
+                } else {
                     "• Icosphere surface with per-cell bedrock, water, ice, soil, climate and river state\n\
                      • Seeded fractal terrain, continent masks, plate-boundary relief and calibrated sea level\n\
                      • One-layer radiative energy balance with logarithmic CO₂ forcing, water-vapour feedback, clouds, ice-albedo and aerosols\n\
@@ -1291,11 +1363,20 @@ fn help_window(ctx: &egui::Context, state: &mut UiState) {
                      • Evaporation → precipitation → soil → runoff → downhill river routing → ocean; snow, glacier growth/melt and a mass-conserving sea level\n\
                      • Kinematic plate motion, boundary uplift/trenches, erosion, volcanism, seismic activity\n\
                      • Asteroid impacts with energy-scaled crater deformation and dust; volcanic gas/aerosol injections; ice-age forcing\n\
-                     • Weather events with local effects, a full event log, adaptive history, checkpoints, forks and versioned saves",
-                );
+                     • Weather events with local effects, a full event log, adaptive history, checkpoints, forks and versioned saves"
+                });
                 ui.separator();
-                ui.heading("Deliberate simplifications");
-                ui.label(
+                ui.heading(tr("Deliberate simplifications"));
+                ui.label(if ru {
+                    "• Нет 3D общей циркуляции атмосферы/океана; перенос тепла — параметризованный диффузионный/меридиональный член.\n\
+                     • Углеродные резервуары используют иллюстративные коэффициенты, а не калиброванную биогеохимическую модель.\n\
+                     • Озёра — диагностические стоки маршрутизированного водного баланса; их запас не управляет эвстатическим уровнем моря.\n\
+                     • Погода региональная и стохастическая, не решается гидродинамикой; на геологических скоростях она субдискретизируется.\n\
+                     • Лёд — баланс массы/толщины; нет решателя динамики ледниковых щитов.\n\
+                     • Тектоника кинематическая; нет мантийной конвекции и изостазии.\n\
+                     • Магнитное поле отслеживается и может инвертироваться, но динамо и космическо-лучевая климатическая связь не заявлены.\n\
+                     • 3D-сетка преувеличивает высоту; все сохранённые значения — в метрах."
+                } else {
                     "• No 3-D atmospheric or ocean general circulation; heat transport is a parameterised diffusive/meridional term.\n\
                      • Carbon reservoirs use illustrative ratios, not a calibrated biogeochemical model.\n\
                      • Lakes are diagnostic sinks of the routed water balance; their storage does not drive eustatic sea level.\n\
@@ -1303,27 +1384,35 @@ fn help_window(ctx: &egui::Context, state: &mut UiState) {
                      • Ice flow is mass-balance/thickness based; no ice-sheet dynamics solver.\n\
                      • Tectonics is kinematic; no mantle convection or isostasy.\n\
                      • The magnetic field is tracked and can reverse, but no dynamo or cosmic-ray climate coupling is claimed.\n\
-                     • The 3-D mesh exaggerates elevation; all stored values are metres.",
-                );
+                     • The 3-D mesh exaggerates elevation; all stored values are metres."
+                });
                 ui.separator();
-                ui.heading("Controls");
-                ui.label(
+                ui.heading(tr("Controls"));
+                ui.label(if ru {
+                    "ЛКМ + перетаскивание — вращение; колесо — зум. Клик по поверхности выбирает ячейку. Пробел — пауза; нижняя панель — скорость и шаги. Левая панель — слои; правая — выбранный регион."
+                } else {
                     "Drag with the left mouse button to orbit; scroll to zoom. Click the surface to select a cell. \
-                     Space pauses; use the bottom bar for speed and queued steps. The left panel selects data layers; the right panel inspects the selected region.",
-                );
+                     Space pauses; use the bottom bar for speed and queued steps. The left panel selects data layers; the right panel inspects the selected region."
+                });
                 ui.separator();
-                ui.heading("Status");
-                ui.label(
+                ui.heading(tr("Status"));
+                ui.label(if ru {
+                    "Это функциональный упрощённый симулятор, а не валидированная климатическая или геофизическая модель. Точная матрица реализованного/частичного/запланированного — в docs/STATUS.md."
+                } else {
                     "This is a functional simplified simulator, not a validated climate or geophysical model. \
-                     Read docs/STATUS.md for the exact implemented / partial / planned matrix.",
-                );
+                     Read docs/STATUS.md for the exact implemented / partial / planned matrix."
+                });
             });
         });
     state.show_help = open;
 }
 
 fn stat_pair(ui: &mut egui::Ui, label: &str, value: String) {
-    ui.label(egui::RichText::new(label).size(9.5).color(muted()));
+    ui.label(
+        egui::RichText::new(translated(label))
+            .size(9.5)
+            .color(muted()),
+    );
     ui.label(egui::RichText::new(value).size(10.5).monospace());
 }
 

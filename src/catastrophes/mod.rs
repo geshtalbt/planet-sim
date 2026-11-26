@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::atmosphere::{AtmosphereState, CarbonState};
 use crate::climate::ClimateState;
+use crate::localization::tr;
 use crate::planet_generator::PlanetConfig;
 use crate::terrain::PlanetGrid;
 
@@ -27,7 +28,7 @@ pub enum CatastropheKind {
 
 impl CatastropheKind {
     pub fn label(self) -> &'static str {
-        match self {
+        tr(match self {
             Self::Volcano => "Volcanic eruption",
             Self::Impact => "Asteroid impact",
             Self::IceAge => "Glaciation forcing",
@@ -36,7 +37,7 @@ impl CatastropheKind {
             Self::OceanCirculation => "Ocean circulation change",
             Self::MagneticReversal => "Magnetic field excursion",
             Self::Drought => "Global drought",
-        }
+        })
     }
 }
 
