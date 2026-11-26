@@ -163,7 +163,7 @@ src/
   ui/                main menu, creation, simulation and science panels
 ```
 
-The 3-D orbital motion is a readability layer: its 28-second period is independent of the simulation clock, while the climate seasonal cycle continues to use simulation time and axial tilt. The simulation core — everything except `app`, `rendering` and `ui` — does not depend on Bevy and is unit-tested independently. `examples/inspect.rs` is a headless diagnostic:
+The 3-D orbital and axial-spin motion is a readability layer: the 28-second orbital period and the visual spin rate are independent of the simulation clock, while the climate seasonal cycle continues to use simulation time and axial tilt. The axial tilt itself is read directly from the live planet configuration, so moving the tilt slider visibly tilts the 3-D planet. The simulation core — everything except `app`, `rendering` and `ui` — does not depend on Bevy and is unit-tested independently. `examples/inspect.rs` is a headless diagnostic:
 
 ```bash
 cargo run --profile test --example inspect -- 6

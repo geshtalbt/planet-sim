@@ -46,6 +46,9 @@ pub struct OrbitalState {
     /// Real seconds per visual orbit. The simulation clock drives the climate;
     /// this is a deliberately readable visual orbit.
     pub period_seconds: f32,
+    /// Visual axial spin angle in radians. The spin rate is derived from the
+    /// configured rotation period but scaled for readability.
+    pub axial_spin: f32,
 }
 
 impl Default for OrbitalState {
@@ -54,6 +57,7 @@ impl Default for OrbitalState {
             angle: 0.4,
             radius: 4.5,
             period_seconds: 28.0,
+            axial_spin: 0.0,
         }
     }
 }
@@ -70,6 +74,9 @@ struct StarBody;
 #[derive(Component)]
 struct OrbitRing;
 
+#[derive(Component)]
+struct AxisLine;
+
 #[derive(Resource, Default)]
 pub struct PlanetVisual {
     pub planet_entity: Option<Entity>,
@@ -80,6 +87,7 @@ pub struct PlanetVisual {
     pub marker_entity: Option<Entity>,
     pub star_entity: Option<Entity>,
     pub orbit_entity: Option<Entity>,
+    pub axis_entity: Option<Entity>,
     pub last_revision: u64,
     pub last_active: usize,
     pub last_layer: Option<MapLayer>,
@@ -204,6 +212,32 @@ fn setup_scene(
         ))
         .id();
 
+    let mut axis_positions = Vec::new();
+    let mut axis_colors = Vec::new();
+    for y in [-1.35f32, 1.35] {
+        let a = y.abs() / 1.35;
+        axis_positions.push([0.0, y, 0.0]);
+        axis_colors.push([0.35 * a, 0.80 * a, 1.0 * a, 0.65]);
+    }
+    let mut axis_mesh = Mesh::new(PrimitiveTopology::LineList, RenderAssetUsages::default());
+    axis_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, axis_positions);
+    axis_mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, axis_colors);
+    let axis_entity = commands
+        .spawn((
+            Name::new("Planet rotation axis"),
+            AxisLine,
+            Mesh3d(meshes.add(axis_mesh)),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: Color::srgba(0.35, 0.80, 1.0, 0.65),
+                alpha_mode: AlphaMode::Blend,
+                unlit: true,
+                ..default()
+            })),
+            Transform::default(),
+            Visibility::Hidden,
+        ))
+        .id();
+
     // A point light at the star guarantees the correct illuminated hemisphere
     // independently of directional-light sign conventions.
     commands.spawn((
@@ -274,6 +308,7 @@ fn setup_scene(
         marker_entity: Some(marker),
         star_entity: Some(star_entity),
         orbit_entity: Some(orbit_entity),
+        axis_entity: Some(axis_entity),
         ..default()
     });
 }
@@ -284,6 +319,11 @@ fn orbit_position(orbital: &OrbitalState) -> Vec3 {
         0.0,
         orbital.angle.sin() * orbital.radius,
     )
+}
+
+fn planet_rotation(tilt_deg: f32, spin: f32) -> Quat {
+    // Tilt the spin axis around world Z, then spin around the planet's local Y.
+    Quat::from_rotation_z(tilt_deg.to_radians()) * Quat::from_rotation_y(spin)
 }
 
 fn update_orbital(
@@ -303,6 +343,17 @@ fn update_orbital(
     }
     orbital.angle = (orbital.angle
         + time.delta_secs() * std::f32::consts::TAU / orbital.period_seconds)
+        .rem_euclid(std::f32::consts::TAU);
+    // Make spin visible at human timescales. A 24-hour planet takes ~11 s
+    // per visual rotation; very fast/slow rotators remain perceptible.
+    let hours = sim
+        .active_planet()
+        .config
+        .rotation_period_hours
+        .clamp(1.0, 1_000.0);
+    let visual_spin_period = (hours * 0.45).clamp(2.0, 120.0);
+    orbital.axial_spin = (orbital.axial_spin
+        + time.delta_secs() * std::f32::consts::TAU / visual_spin_period)
         .rem_euclid(std::f32::consts::TAU);
 }
 
@@ -399,14 +450,19 @@ fn sync_visual(
         return;
     };
     let planet_position = orbit_position(&orbital);
-    commands.entity(planet_entity).insert((
-        Visibility::Visible,
-        Transform::from_translation(planet_position),
-    ));
+    let rotation = planet_rotation(planet.config.axial_tilt_deg, orbital.axial_spin);
+    let planet_transform = Transform::from_translation(planet_position).with_rotation(rotation);
+    commands
+        .entity(planet_entity)
+        .insert((Visibility::Visible, planet_transform));
     if let Some(entity) = visual.rivers_entity {
-        commands
-            .entity(entity)
-            .insert(Transform::from_translation(planet_position));
+        commands.entity(entity).insert(planet_transform);
+    }
+    if let Some(entity) = visual.axis_entity {
+        commands.entity(entity).insert((
+            Visibility::Visible,
+            Transform::from_translation(planet_position).with_rotation(rotation),
+        ));
     }
     if let Some(entity) = visual.star_entity {
         commands.entity(entity).insert(Visibility::Visible);
@@ -477,7 +533,7 @@ fn sync_visual(
         if let Some(cell) = view.selected_cell.filter(|c| *c < planet.grid.cell_count()) {
             let radius =
                 crate::rendering::surface_radius(planet, cell, view.elevation_exaggeration) * 1.012;
-            let pos = planet_position + planet.grid.direction(cell) * radius;
+            let pos = planet_position + rotation * (planet.grid.direction(cell) * radius);
             commands.entity(marker).insert((
                 Transform::from_translation(pos).with_scale(Vec3::splat(0.013)),
                 Visibility::Visible,
@@ -496,6 +552,7 @@ fn hide_visual(commands: &mut Commands, visual: &PlanetVisual) {
         visual.marker_entity,
         visual.star_entity,
         visual.orbit_entity,
+        visual.axis_entity,
     ]
     .into_iter()
     .flatten()
@@ -571,10 +628,12 @@ fn camera_control(
                 if t > 0.0 {
                     let point = origin + direction * t;
                     if let Some(sim) = simulation.0.as_ref() {
-                        let cell = sim
-                            .active_planet()
-                            .grid
-                            .nearest_cell((point - target).normalize());
+                        let rotation = planet_rotation(
+                            sim.active_planet().config.axial_tilt_deg,
+                            orbital.axial_spin,
+                        );
+                        let local = rotation.inverse() * (point - target).normalize();
+                        let cell = sim.active_planet().grid.nearest_cell(local);
                         view.selected_cell = Some(cell);
                     }
                 }
