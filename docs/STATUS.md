@@ -10,7 +10,7 @@ Legend: **Implemented** = used by the simulation and exposed in the UI; **Partia
 | Modular architecture | Implemented | 15+ modules, simulation core independent of Bevy |
 | Seeded procedural generation | Implemented | deterministic 3-D gradient/fBm noise, continent masks, plate relief |
 | Planet creation screen | Implemented | presets, custom, randomise, seed, live validation |
-| 3-D planet + camera | Implemented | icosphere mesh, orbit/zoom, click selection |
+| 3-D planet + camera | Implemented | icosphere mesh, orbit/zoom, click selection, visible host-star orbit, axial spin, live axial tilt and thin pole-axis line |
 | Time engine | Implemented | pause, 15 presets (minute/s → billion years/s), queued steps, checkpoints |
 | Statistics | Implemented | computed from cells/reservoirs, no synthetic values |
 | Save/load | Implemented | versioned gzip JSON, topology rebuilt on load |
